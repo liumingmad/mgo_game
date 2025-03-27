@@ -1,5 +1,12 @@
 #include <string>
 #include <random>
+#include <crypto++/cryptlib.h>
+#include <crypto++/osrng.h>
+#include <iostream>
+#include <crypto++/files.h>
+#include <crypto++/base64.h>
+#include <crypto++/modes.h>
+#include <crypto++/hex.h>
 
 #include "cryptoUtils.h"
 

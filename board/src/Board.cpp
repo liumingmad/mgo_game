@@ -1,6 +1,7 @@
 #include <iostream>
 #include "Board.h"
 #include "../include/utils.h"
+#include "Log.h"
 
 using namespace std;
 
@@ -29,7 +30,7 @@ int Board::get(int x, int y) {
 int Board::move(int x, int y, char player) {
     if (check(x, y, player) == 0) return 0;
     if (isSuicide(x, y, player, *(this->current->data))) {
-        log("Error: move() is suicide.");
+        Log::error("Error: move() is suicide.");
         return 0;
     }
 
