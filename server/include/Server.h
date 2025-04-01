@@ -17,16 +17,17 @@ class Client {
 public:
     int fd;
     struct sockaddr_in clientaddr;
-    RingBuffer* ringBuffer;    
+    RingBuffer* ringBuffer;
+    Core* core;
 };
 
 
 class Server {
 private:
-    std::map<int, Client> clientMap;
     ThreadPool pool;
 
 public:
+    static std::map<int, Client> clientMap;
     int init();
     int run(int port);
     int handle_request(int fd);
@@ -34,6 +35,7 @@ public:
     int add_client(int fd, struct sockaddr_in addr);
     int remove_client(int fd);
     int shutdown();
+
 };
 
 

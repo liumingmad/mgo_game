@@ -1,69 +1,35 @@
-#ifndef CORE_H
-#define CORE_H
-
-#include <iostream>
-
 #include "Log.h"
+#include "core.h"
+int Core::run(Message& msg)
+{
+    Log::info("Core::run()");
 
-class Core {
-private:
-    enum CoreState {
-        UNAUTH,     // 未鉴权
-        FREE,       // 鉴权通过
-        INIT,       // 创建房间后，进入这个状态。接受对局申请后，进入GAMING状态, 开始计时
-        GAMING,     // 游戏中(子状态机:GameState)
-        FINISH,     // 游戏结束
-    };
+    // 1. json转成对象
 
-    enum GameState {
-        PAUSE_OFFLINE,              // 计时器暂停, 对手掉线
-        WAITTING_BLACK_MOVE,        // 计时器开启, 等待黑棋落子  
-        WAITTING_WHITE_MOVE,        // 计时器开启, 等待白棋落子
-        COUNTING_POINTS,            // 计时器暂停, 等待对局结束, 计算棋盘点数
-        GAME_OVER,                  // 计时器暂停, 游戏结束
-    };
+    // 2. 根据状态机处理消息
 
-    CoreState mState;
-    GameState mGameState;
+    if (mState == UNAUTH) {
 
-public:
-    Core(){
-        mState = UNAUTH;
-    }
+    } else if (mState == FREE) {
 
-    ~Core(){}
+    } else if (mState == INIT) {
 
-    int run()
-    {
-        Log::info("Core::run()");
+    } else if (mState == GAMING) {
 
-        if (mState == UNAUTH) {
+        if (mGameState == PAUSE_OFFLINE) {
 
-        } else if (mState == FREE) {
+        } else if (mGameState == WAITTING_BLACK_MOVE) {
 
-        } else if (mState == INIT) {
+        } else if (mGameState == WAITTING_WHITE_MOVE) {
 
-        } else if (mState == GAMING) {
+        } else if (mGameState == COUNTING_POINTS) {
 
-            if (mGameState == PAUSE_OFFLINE) {
-
-            } else if (mGameState == WAITTING_BLACK_MOVE) {
-
-            } else if (mGameState == WAITTING_WHITE_MOVE) {
-
-            } else if (mGameState == COUNTING_POINTS) {
-
-            } else if (mGameState == GAME_OVER) {
-
-            }
-
-        } else if (mState == FINISH) {
+        } else if (mGameState == GAME_OVER) {
 
         }
-        return 0;
+
+    } else if (mState == FINISH) {
+
     }
-
-
-};
-
-#endif // CORE_H
+    return 0;
+}

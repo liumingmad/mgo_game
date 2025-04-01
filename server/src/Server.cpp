@@ -10,6 +10,8 @@
 #include "Server.h"
 #include "Handler.h"
 #include "protocol.h"
+#include "Log.h"
+#include "core.h"
 
 int Server::init() {
     pool.init();
@@ -132,7 +134,9 @@ int Server::handle_request(int fd) {
 }
 
 void handle_message(Message* msg) {
-    writeResponse(msg->fd, "server:" + msg->text + "\n");
+    // writeResponse(msg->fd, "server:" + msg->text + "\n");
+    Core* core = Server::clientMap[msg->fd].core;
+    core->run(*msg);
 }
 
 void printMap(std::map<int, Client> map) {
@@ -152,6 +156,7 @@ int Server::add_client(int fd, struct sockaddr_in addr) {
     client->fd = fd;
     client->clientaddr = addr;
     client->ringBuffer = new RingBuffer(RING_BUFFER_SIZE);
+    client->core = new Core();
     clientMap[fd] = *client;
     // printMap(clientMap);
 
@@ -164,3 +169,4 @@ int Server::remove_client(int fd) {
     // printMap(clientMap);
     return 0;
 }
+
