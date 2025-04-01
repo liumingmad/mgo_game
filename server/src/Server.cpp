@@ -96,33 +96,40 @@ int Server::handle_request(int fd) {
     const size_t BUF_SIZE = 512; 
     char buf[BUF_SIZE];
     bzero(buf, BUF_SIZE);
+
     int n = Read(fd, buf, BUF_SIZE);
-    if (n > 0) {
-        // 1.先从内核读到ringbufer中
-        RingBuffer* rb = clientMap[fd].ringBuffer;
-        rb->push(buf, n);
+    if (n == 0) {
+        return 0;
+    }
 
-        // 2.解析协议
-        // 解析协议头
-        ProtocolParser parser;
-        ProtocolHeader* header = parser.parse_header(buf, HEADER_SIZE);
+    // 查看ringbuffer中是否残存数据, 如果存在，就沾包
+    RingBuffer* rb = clientMap[fd].ringBuffer;
+    rb->push(buf, n);
 
-        if (true) {
-            std::string str(buf+13, header->data_length);
-            std::transform(str.begin(), str.end(), str.begin(), [](unsigned char c){ return std::toupper(c); });
-            writeResponse(fd, "server:" + str + "\n");
-            return n;
+    ProtocolParser parser;
+    while (true) {
+        // 1.在buffer中，检查是否存在一条完整的协议
+        size_t len = parser.exist_one_protocol(rb);
+        if (len == 0) {
+            break;
         }
 
-        // 解析协议体
+        // 2.解析协议头
+        ProtocolHeader* header = parser.parse_header(buf, HEADER_SIZE);
 
+        // 3.把数据放入Message, 交给线程池处理
         Message* msg = new Message();
         msg->fd = fd;
-        msg->text = std::string(buf);
-
-        // 3. submit to thread pool
+        msg->text = std::string(buf+13, header->data_length);
         pool.submit(handle_message, msg);
+
+        // 4. 删除处理过的数据
+        rb->pop(nullptr, header->data_length + HEADER_SIZE);
     }
+
+    // 清理无效数据
+    parser.clear_invalid_data(rb);
+
     return n;
 }
 

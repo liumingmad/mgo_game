@@ -3,6 +3,7 @@
 
 #include <string>
 #include <cstring>
+#include "protocol.h"
 
 /*
 自定义网络协议的协议头设计需要兼顾高效性、可扩展性和安全性，通常包含以下核心字段：
@@ -72,6 +73,39 @@ class ProtocolParser {
 public:
     ProtocolParser() {}
     ~ProtocolParser() {}
+
+    // 检查并删除ringbuffer中无效的data
+    void clear_invalid_data(RingBuffer* buf) {
+        size_t size = buf->get_size();
+        char tmp[size];
+        buf->peek(tmp, size);
+        std::string str(tmp, size);
+        size_t index = str.find_first_of(MAGIC_NUMBER);
+        buf->pop(nullptr, index);
+    }
+
+    // 检测ringbuffer里是否包含一个完整的协议, 如果存在，返回长度，不存在返回0
+    int exist_one_protocol(RingBuffer* buf) {
+        if (buf->get_size() < HEADER_SIZE) {
+            return 0;
+        }
+
+        char tmp[4];
+        buf->peek(tmp, 4);
+        if (memcmp(tmp, MAGIC_NUMBER, 4) != 0) {
+            return false;
+        }
+
+        // data_length
+        buf->peek(tmp+HEADER_SIZE-4, 4);
+        size_t data_len = (tmp[9] << 24) | (tmp[10] << 16) | (tmp[11] << 8) | tmp[12];
+        int proc_len = HEADER_SIZE + data_len;
+        if (proc_len > buf->get_size()) {
+            return false;
+        }
+
+        return proc_len;
+    }
 
     ProtocolHeader* parse_header(char* buf, int len) {
         if (len < HEADER_SIZE) {

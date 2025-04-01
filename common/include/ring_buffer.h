@@ -80,6 +80,33 @@ public:
         return len;
     }
 
+    size_t peek(char* data, size_t len) {
+        if (len <= 0) {
+            std::cout << "RingBuffer len <= 0" << std::endl;
+            return 0;
+        }
+
+        if (isEmpty()) {
+            std::cout << "RingBuffer is empty" << std::endl;
+            return 0;
+        }
+
+        if (len > size) {
+            std::cout << "RingBuffer len > size" << std::endl;
+            return 0;
+        }
+
+        if (tail + len < capacity) {
+            memcpy(data, buffer+tail, len);
+        } else {
+            // 分两段拷贝
+            const size_t first_chunk = capacity - tail;
+            memcpy(data, buffer+tail, first_chunk);
+            memcpy(data+first_chunk, buffer, len-first_chunk);
+        }
+        return len;
+    }
+
     bool isFull()
     {
         return this->size == this->capacity;
@@ -130,6 +157,12 @@ public:
     {
         return capacity - size;
     }
+
+    size_t get_size() const {
+        return this->size;
+    }
+
+
 };
 
 #endif
