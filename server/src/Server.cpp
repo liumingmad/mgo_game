@@ -93,10 +93,8 @@ int writeResponse(int fd, std::string response)
 }
 
 int Server::handle_request(int fd) {
-    const size_t BUF_SIZE = 512; 
     char buf[BUF_SIZE];
     bzero(buf, BUF_SIZE);
-
     int n = Read(fd, buf, BUF_SIZE);
     if (n == 0) {
         return 0;
@@ -108,7 +106,7 @@ int Server::handle_request(int fd) {
 
     ProtocolParser parser;
     while (true) {
-        // 1.在buffer中，检查是否存在一条完整的协议
+        // 1.在buffer中，检查是否存在一条完整的协议, 返回协议的全长
         size_t len = parser.exist_one_protocol(rb);
         if (len == 0) {
             break;
@@ -120,11 +118,11 @@ int Server::handle_request(int fd) {
         // 3.把数据放入Message, 交给线程池处理
         Message* msg = new Message();
         msg->fd = fd;
-        msg->text = std::string(buf+13, header->data_length);
+        msg->text = std::string(buf+HEADER_SIZE, header->data_length);
         pool.submit(handle_message, msg);
 
         // 4. 删除处理过的数据
-        rb->pop(nullptr, header->data_length + HEADER_SIZE);
+        rb->pop(nullptr, len);
     }
 
     // 清理无效数据

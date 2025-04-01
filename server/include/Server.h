@@ -10,7 +10,8 @@
 #include "ring_buffer.h"
 
 #define MAX_CLIENT_SIZE 100
-constexpr size_t RING_BUFFER_SIZE = 128 * 1024;
+constexpr size_t BUF_SIZE = 32;// 512;
+constexpr size_t RING_BUFFER_SIZE = 128;// 128 * 1024;
 
 class Client {
 public:

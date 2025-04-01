@@ -90,14 +90,15 @@ public:
             return 0;
         }
 
-        char tmp[4];
-        buf->peek(tmp, 4);
-        if (memcmp(tmp, MAGIC_NUMBER, 4) != 0) {
+        char tmp[HEADER_SIZE];
+        buf->peek(tmp, HEADER_SIZE);
+
+        // magic_number
+        if (memcmp(tmp, MAGIC_NUMBER, strlen(MAGIC_NUMBER)) != 0) {
             return false;
         }
 
         // data_length
-        buf->peek(tmp+HEADER_SIZE-4, 4);
         size_t data_len = (tmp[9] << 24) | (tmp[10] << 16) | (tmp[11] << 8) | tmp[12];
         int proc_len = HEADER_SIZE + data_len;
         if (proc_len > buf->get_size()) {
