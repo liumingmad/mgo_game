@@ -9,6 +9,7 @@
 #include "wrap.h"
 #include "Server.h"
 #include "Handler.h"
+#include "protocol.h"
 
 int Server::init() {
     pool.init();
@@ -83,33 +84,46 @@ int Server::run(int port)
     return 0;
 }
 
-int Server::handle_request(int fd) {
-    char buf[MAX_BUF_SIZE];
-    bzero(buf, MAX_BUF_SIZE);
-    int n = Read(fd, buf, MAX_BUF_SIZE);
-    if (n > 0) {
-        // 如果最后一个字符是换行，则删掉
-        if (n <= MAX_BUF_SIZE && buf[n-1] == '\n') {
-            buf[n-1] = 0;
-        }
-
-        // 1. read one item message
-        Message* msg = new Message();
-        msg->fd = fd;
-        msg->text = std::string(buf);
-
-        // 2. submit to thread pool
-        pool.submit(handle_message, msg);
-    }
-    return n;
-}
-
 int writeResponse(int fd, std::string response)
 {
     const char *text = response.c_str();
     int len = response.length();
     Write(fd, text, len);
     return 0;
+}
+
+int Server::handle_request(int fd) {
+    const size_t BUF_SIZE = 512; 
+    char buf[BUF_SIZE];
+    bzero(buf, BUF_SIZE);
+    int n = Read(fd, buf, BUF_SIZE);
+    if (n > 0) {
+        // 1.先从内核读到ringbufer中
+        RingBuffer* rb = clientMap[fd].ringBuffer;
+        rb->push(buf, n);
+
+        // 2.解析协议
+        // 解析协议头
+        ProtocolParser parser;
+        ProtocolHeader* header = parser.parse_header(buf, HEADER_SIZE);
+
+        if (true) {
+            std::string str(buf+13, header->data_length);
+            std::transform(str.begin(), str.end(), str.begin(), [](unsigned char c){ return std::toupper(c); });
+            writeResponse(fd, "server:" + str + "\n");
+            return n;
+        }
+
+        // 解析协议体
+
+        Message* msg = new Message();
+        msg->fd = fd;
+        msg->text = std::string(buf);
+
+        // 3. submit to thread pool
+        pool.submit(handle_message, msg);
+    }
+    return n;
 }
 
 void handle_message(Message* msg) {
@@ -132,6 +146,7 @@ int Server::add_client(int fd, struct sockaddr_in addr) {
     Client* client = new Client();
     client->fd = fd;
     client->clientaddr = addr;
+    client->ringBuffer = new RingBuffer(RING_BUFFER_SIZE);
     clientMap[fd] = *client;
     // printMap(clientMap);
 

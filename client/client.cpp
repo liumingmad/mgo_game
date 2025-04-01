@@ -36,8 +36,8 @@ int MgoClient::socket_connect() {
     return status;
 }
 
-int MgoClient::socket_write(const char* message) {
-	return send(client_fd, message, strlen(message), 0);
+int MgoClient::socket_write(const char* message, size_t len) {
+	return send(client_fd, message, len, 0);
 }
 
 int MgoClient::socket_read(char* buf) {

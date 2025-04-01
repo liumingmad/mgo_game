@@ -17,7 +17,7 @@ public:
     ~MgoClient();
     int socket_init(const char* host, int port);
     int socket_connect();
-    int socket_write(const char* message);
+    int socket_write(const char* message, size_t len);
     int socket_read(char* buf);
     int socket_close();
 };

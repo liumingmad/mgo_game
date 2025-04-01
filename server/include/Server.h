@@ -6,15 +6,17 @@
 #include <netinet/in.h>
 #include <arpa/inet.h>
 #include "ThreadPool.h"
+#include "Log.h"
+#include "ring_buffer.h"
 
 #define MAX_CLIENT_SIZE 100
-#define MAX_BUF_SIZE 512
+constexpr size_t RING_BUFFER_SIZE = 128 * 1024;
 
 class Client {
 public:
     int fd;
     struct sockaddr_in clientaddr;
-    
+    RingBuffer* ringBuffer;    
 };
 
 
