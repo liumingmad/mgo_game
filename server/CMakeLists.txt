@@ -9,10 +9,16 @@ set(CMAKE_BUILD_TYPE "Debug")
 set(CMAKE_C_FLAGS_DEBUG "$ENV{CFLAGS} -O0 -Wall -g -ggdb")
 set(CMAKE_CXX_FLAGS_DEBUG "$ENV{CXXFLAGS} -O0 -Wall -g -ggdb")
 
+
+
 aux_source_directory(src SRC_LIST)
 
 # 添加静态库
 add_library(server STATIC ${SRC_LIST})
+
+# 链接静态库和动态库
+find_package(OpenSSL REQUIRED)
+target_link_libraries(server PRIVATE OpenSSL::SSL OpenSSL::Crypto)
 
 target_link_libraries(server PRIVATE common)
 

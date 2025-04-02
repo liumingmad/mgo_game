@@ -8,6 +8,7 @@
 #include "ThreadPool.h"
 #include "Log.h"
 #include "ring_buffer.h"
+#include "core.h"
 
 #define MAX_CLIENT_SIZE 100
 constexpr size_t BUF_SIZE = 512;
@@ -21,13 +22,13 @@ public:
     Core* core;
 };
 
+static std::map<int, Client> clientMap;
 
 class Server {
 private:
     ThreadPool pool;
 
 public:
-    static std::map<int, Client> clientMap;
     int init();
     int run(int port);
     int handle_request(int fd);

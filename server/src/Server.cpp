@@ -135,7 +135,7 @@ int Server::handle_request(int fd) {
 
 void handle_message(Message* msg) {
     // writeResponse(msg->fd, "server:" + msg->text + "\n");
-    Core* core = Server::clientMap[msg->fd].core;
+    Core* core = clientMap[msg->fd].core;
     core->run(*msg);
 }
 

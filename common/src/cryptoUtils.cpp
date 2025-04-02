@@ -7,6 +7,7 @@
 #include <crypto++/base64.h>
 #include <crypto++/modes.h>
 #include <crypto++/hex.h>
+#include <jwt-cpp/jwt.h>
 
 #include "cryptoUtils.h"
 
@@ -121,4 +122,38 @@ std::string strRand(int length) {			// length: 产生字符串的长度
         buffer += tmp;
     }
     return buffer;
+}
+
+// 生成 JWT
+std::string generate_jwt(const std::string& user_id) {
+    auto token = jwt::create()
+        .set_issuer("ming")                     // 签发者
+        .set_subject("auth")                         // 用途
+        .set_audience("mgo_app")                  // 接收方
+        .set_payload_claim("user_id", jwt::claim(user_id)) // 自定义声明
+        .set_issued_at(std::chrono::system_clock::now())    // 签发时间
+        .set_expires_at(std::chrono::system_clock::now() + std::chrono::hours(24)) // 24小时后过期
+        .sign(jwt::algorithm::hs256{SECRET}); // HS256 算法签名
+    return token;
+}
+bool validate_jwt(const std::string& token) {
+    try {
+        // 解码 Token
+        auto decoded = jwt::decode(token);
+        
+        // 创建验证器
+        auto verifier = jwt::verify()
+            .allow_algorithm(jwt::algorithm::hs256{SECRET}) // 校验算法和密钥
+            .with_issuer("ming")    // 必须匹配签发者
+            .with_audience("mgo_app"); // 必须匹配接收方
+
+        verifier.verify(decoded); // 验证签名和有效期
+        return true;
+    } catch (const jwt::error::token_verification_exception& e) {
+        std::cerr << "Token 验证失败: " << e.what() << std::endl;
+        return false;
+    } catch (const std::exception& e) {
+        std::cerr << "错误: " << e.what() << std::endl;
+        return false;
+    }
 }

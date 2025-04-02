@@ -1,14 +1,20 @@
 #include "Log.h"
 #include "core.h"
+#include "json.hpp"
+#include "body.h"
+#include "cryptoUtils.h"
 int Core::run(Message& msg)
 {
     Log::info("Core::run()");
 
     // 1. json转成对象
+    nlohmann::json j = nlohmann::json::parse(msg.text);
+    Request request = j.get<Request>();
 
     // 2. 根据状态机处理消息
-
     if (mState == UNAUTH) {
+        std::string token = generate_jwt("123");
+        std::cout << token << std::endl;
 
     } else if (mState == FREE) {
 
