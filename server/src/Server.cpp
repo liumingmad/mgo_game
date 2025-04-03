@@ -12,9 +12,20 @@
 #include "protocol.h"
 #include "Log.h"
 #include "core.h"
+#include "connection_pool.h"
 
 int Server::init() {
+    // 初始化数据库连接池
+    ConnectionPool::getInstance()->initPool(
+        "tcp://172.17.0.1:3306",
+        "root",
+        "123456",
+        "mgo",
+        15); // 初始连接数设为15
+
+    // 线程池
     pool.init();
+
     return 0;
 }
 
