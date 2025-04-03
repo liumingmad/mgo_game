@@ -62,7 +62,6 @@ void run_client()
         int data_len = strlen(message+13);
         write_buffer(reinterpret_cast<uint8_t*>(message), data_len);
         client.socket_write(message, data_len+13);
-
         client.socket_read(buf);
         std::cout << buf << std::endl;
     }

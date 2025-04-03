@@ -51,15 +51,25 @@ int Core::run(Message &msg)
     }
     else if (mState == FREE)
     {
-        // get_room_list
-        // get_online_player_list
-        // find_player
-        // get_player_info
-        // get_sgf
-        // get_sgf_list
-        // create_room
-        // enter_room
-        // sign_out
+        if (request.action == "get_room_list") {
+
+        } else if (request.action == "get_online_player_list") {
+
+        } else if (request.action == "find_player") {
+
+        } else if (request.action == "get_player_info") {
+
+        } else if (request.action == "get_sgf") {
+
+        } else if (request.action == "get_sgf_list") {
+
+        } else if (request.action == "create_room") {
+
+        } else if (request.action == "enter_room") {
+
+        } else if (request.action == "sign_out") {
+
+        }
     }
     else if (mState == IN_ROOM)
     {
