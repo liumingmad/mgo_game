@@ -54,7 +54,7 @@ int do_create_room(int fd, Request request)
     Room room;
     auto now = std::chrono::system_clock::now();
     auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(now.time_since_epoch());
-    room.id = std::to_string(duration.count());
+    room.id = extract_user_id(request.token) + "_" + std::to_string(duration.count());
     g_rooms[room.id] = room;
 
     Response resp;
