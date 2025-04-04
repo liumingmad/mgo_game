@@ -132,7 +132,7 @@ std::string generate_jwt(const std::string& user_id) {
         .set_audience("mgo_app")                  // 接收方
         .set_payload_claim("user_id", jwt::claim(user_id)) // 自定义声明
         .set_issued_at(std::chrono::system_clock::now())    // 签发时间
-        .set_expires_at(std::chrono::system_clock::now() + std::chrono::hours(24)) // 24小时后过期
+        .set_expires_at(std::chrono::system_clock::now() + std::chrono::hours(365*24)) // 24小时后过期
         .sign(jwt::algorithm::hs256{SECRET}); // HS256 算法签名
     return token;
 }
@@ -140,7 +140,7 @@ bool validate_jwt(const std::string& token) {
     try {
         // 解码 Token
         auto decoded = jwt::decode(token);
-        
+
         // 创建验证器
         auto verifier = jwt::verify()
             .allow_algorithm(jwt::algorithm::hs256{SECRET}) // 校验算法和密钥
@@ -155,5 +155,14 @@ bool validate_jwt(const std::string& token) {
     } catch (const std::exception& e) {
         std::cerr << "错误: " << e.what() << std::endl;
         return false;
+    }
+}
+
+std::string extract_user_id(const std::string& token) {
+    try {
+        auto decoded = jwt::decode(token);
+        return decoded.get_payload_claim("user_id").as_string();
+    } catch (const std::exception& e) {
+        throw std::runtime_error("提取 user_id 失败: " + std::string(e.what()));
     }
 }

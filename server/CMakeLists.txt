@@ -21,7 +21,7 @@ find_package(OpenSSL REQUIRED)
 find_package(CURL REQUIRED)
 target_link_libraries(server PRIVATE OpenSSL::SSL OpenSSL::Crypto ${CURL_LIBRARIES} mysqlcppconn)
 
-target_link_libraries(server PRIVATE common)
+target_link_libraries(server PRIVATE common board)
 
 # 让外部可以找到头文件
 target_include_directories(server PUBLIC include)
@@ -30,5 +30,5 @@ target_include_directories(server PUBLIC include)
 option(ENABLE_SERVER_TESTS "Enable tests for server" ON)
 if (ENABLE_SERVER_TESTS)
     add_executable(testserver test/test_procotol.cpp)
-    target_link_libraries(testserver PRIVATE server common)
+    target_link_libraries(testserver PRIVATE server common board)
 endif()

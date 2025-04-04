@@ -16,5 +16,6 @@ std::string strRand(int len);
 
 std::string generate_jwt(const std::string& user_id);
 bool validate_jwt(const std::string& token);
+std::string extract_user_id(const std::string& token);
 
 #endif // CRYPTOUTILS_H
