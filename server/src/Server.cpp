@@ -131,6 +131,7 @@ int Server::handle_request(int fd) {
         // 3.把数据放入Message, 交给线程池处理
         Message* msg = new Message();
         msg->fd = fd;
+        msg->header = header;
         msg->text = std::string(buf+HEADER_SIZE, header->data_length);
         pool.submit(handle_message, msg);
 
@@ -148,6 +149,8 @@ void handle_message(Message* msg) {
     // writeResponse(msg->fd, "server:" + msg->text + "\n");
     Core* core = clientMap[msg->fd].core;
     core->run(*msg);
+
+    // TODO:delete Message
 }
 
 void printMap(std::map<int, Client> map) {
@@ -178,6 +181,8 @@ int Server::remove_client(int fd) {
     std::cout << "remove client " << fd << std::endl;
     clientMap.erase(fd);
     // printMap(clientMap);
+
+    // TODO: delete Core
     return 0;
 }
 

@@ -7,17 +7,21 @@
 #include <wrap.h>
 #include "global.h"
 #include "db_utils.h"
+#include "protocol.h"
 
-int writeResponse(int fd, Response response)
+
+int writeResponse(Message& msg, Response response)
 {
     nlohmann::json j = response;
     std::string json = j.dump();
-    const char *text = json.c_str();
-    Write(fd, text, strlen(text)+1);
+
+    ProtocolWriter pw; 
+    u_int8_t* buf = pw.wrap_header_buffer(msg.header->serial_number, json);
+    Write(msg.fd, buf, HEADER_SIZE+json.length());
     return 0;
 }
 
-int do_sign_in(int fd, Request request)
+int do_sign_in(Message& msg, Request request)
 {
     std::optional<User> user = check_token(request.data);
     if (!user)
@@ -26,13 +30,13 @@ int do_sign_in(int fd, Request request)
     }
     // 创建token
     std::string token = generate_jwt(std::to_string(user->id));
-    writeResponse(fd, Response{200, "xxsign_in success", token});
+    writeResponse(msg, Response{200, "xxsign_in success", token});
 
     Log::info("Core::run() sign_in success");
     return 1;
 }
 
-int do_get_room_list(int fd, Request request)
+int do_get_room_list(Message& msg, Request request)
 {
     Response resp;
     resp.code = 200;
@@ -45,11 +49,11 @@ int do_get_room_list(int fd, Request request)
         rooms.push_back(pair.second);
     }
     resp.data = rooms;
-    writeResponse(fd, resp);
+    writeResponse(msg, resp);
     return 0;
 }
 
-int do_create_room(int fd, Request request)
+int do_create_room(Message& msg, Request request)
 {
     Room room;
     auto now = std::chrono::system_clock::now();
@@ -61,11 +65,11 @@ int do_create_room(int fd, Request request)
     resp.code = 200;
     resp.message = "create_room success";
     resp.data = room;
-    writeResponse(fd, resp);
+    writeResponse(msg, resp);
     return 0;
 }
 
-int do_enter_room(int fd, Request request)
+int do_enter_room(Message& msg, Request request)
 {
     try{
         std::string room_id = request.data["room_id"].get<std::string>();
@@ -74,9 +78,9 @@ int do_enter_room(int fd, Request request)
         Player* p = query_user(user_id);
         if (p) {
             room.players.push_back(*p);
-            writeResponse(fd, Response{200, "enter_room success", room});
+            writeResponse(msg, Response{200, "enter_room success", room});
         } else {
-            writeResponse(fd, Response{400, "enter_room failed", {}});
+            writeResponse(msg, Response{400, "enter_room failed", {}});
         }
     } catch (const std::exception& e) {
         std::cerr << "其他错误: " << e.what() << std::endl;
@@ -115,14 +119,14 @@ int Core::run(Message &msg)
             if (!validate_jwt(request.token))
             {
                 Log::error("Core::run() token is invalid");
-                writeResponse(msg.fd, Response{401, "token is invalid", {}});
+                writeResponse(msg, Response{401, "token is invalid", {}});
                 return 0;
             }
             mState = FREE;
         } else {
             if (request.action == "sign_in")
             {
-                do_sign_in(msg.fd, request);
+                do_sign_in(msg, request);
                 mState = FREE;
                 return 0;
             }
@@ -134,21 +138,21 @@ int Core::run(Message &msg)
         if (!validate_jwt(request.token))
         {
             Log::error("Core::run() token is invalid");
-            writeResponse(msg.fd, Response{401, "token is invalid", {}});
+            writeResponse(msg, Response{401, "token is invalid", {}});
             return 0;
         }
 
         if (request.action == "get_room_list")
         {
-            do_get_room_list(msg.fd, request);
+            do_get_room_list(msg, request);
         }
         else if (request.action == "create_room")
         {
-            do_create_room(msg.fd, request);
+            do_create_room(msg, request);
         }
         else if (request.action == "enter_room")
         {
-            do_enter_room(msg.fd, request);
+            do_enter_room(msg, request);
         }
         else if (request.action == "get_online_player_list")
         {

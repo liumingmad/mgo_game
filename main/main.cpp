@@ -6,7 +6,7 @@ int main(int argc, char const *argv[])
 {
     Server server;
     server.init();
-    server.run(8010);
+    server.run(9001);
     return 0;
 }
 

@@ -50,7 +50,7 @@ void write_buffer(uint8_t* buf, int data_len)
 void run_client()
 {
     MgoClient client;
-    client.socket_init("127.0.0.1", 8010);
+    client.socket_init("127.0.0.1", 9001);
     client.socket_connect();
 
     char message[512] = { 0 };

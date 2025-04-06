@@ -28,7 +28,7 @@
 * 数据:数据
 
 示例：
-MOGO + 1 + JSON + MOVE/HEART + 10 + 129 
+MOGO + 1 + JSON + MOVE/HEART + 10 + 129
 {
     "x": 1,
     "y": 2
@@ -39,7 +39,8 @@ MOGO + 1 + JSON + MOVE/HEART + 10 + 129
 
 #define MAGIC_NUMBER "MOGO"
 
-class ProtocolHeader {
+class ProtocolHeader
+{
 public:
     // MOGO
     char magic_number[4];
@@ -63,19 +64,22 @@ public:
     int data_length;
 };
 
-class Protocol {
+class Protocol
+{
 public:
     ProtocolHeader header;
-    char* data;
+    char *data;
 };
 
-class ProtocolParser {
+class ProtocolParser
+{
 public:
     ProtocolParser() {}
     ~ProtocolParser() {}
 
     // 检查并删除ringbuffer中无效的data
-    void clear_invalid_data(RingBuffer* buf) {
+    void clear_invalid_data(RingBuffer *buf)
+    {
         size_t size = buf->get_size();
         char tmp[size];
         buf->peek(tmp, size);
@@ -85,8 +89,10 @@ public:
     }
 
     // 检测ringbuffer里是否包含一个完整的协议, 如果存在，返回长度，不存在返回0
-    int exist_one_protocol(RingBuffer* buf) {
-        if (buf->get_size() < HEADER_SIZE) {
+    int exist_one_protocol(RingBuffer *buf)
+    {
+        if (buf->get_size() < HEADER_SIZE)
+        {
             return 0;
         }
 
@@ -94,31 +100,36 @@ public:
         buf->peek(tmp, HEADER_SIZE);
 
         // magic_number
-        if (memcmp(tmp, MAGIC_NUMBER, strlen(MAGIC_NUMBER)) != 0) {
+        if (memcmp(tmp, MAGIC_NUMBER, strlen(MAGIC_NUMBER)) != 0)
+        {
             return false;
         }
 
         // data_length
         size_t data_len = (tmp[9] << 24) | (tmp[10] << 16) | (tmp[11] << 8) | tmp[12];
         int proc_len = HEADER_SIZE + data_len;
-        if (proc_len > buf->get_size()) {
+        if (proc_len > buf->get_size())
+        {
             return false;
         }
 
         return proc_len;
     }
 
-    ProtocolHeader* parse_header(char* buf, int len) {
-        if (len < HEADER_SIZE) {
+    ProtocolHeader *parse_header(char *buf, int len)
+    {
+        if (len < HEADER_SIZE)
+        {
             return nullptr;
         }
 
         // magic_number
-        if (memcmp(buf, MAGIC_NUMBER, 4) != 0) {
+        if (memcmp(buf, MAGIC_NUMBER, 4) != 0)
+        {
             return nullptr;
         }
 
-        ProtocolHeader* header = new ProtocolHeader();
+        ProtocolHeader *header = new ProtocolHeader();
 
         // version
         header->version = buf[4];
@@ -135,10 +146,55 @@ public:
         // data_length
         header->data_length = (buf[9] << 24) | (buf[10] << 16) | (buf[11] << 8) | buf[12];
 
-
         return header;
     }
 };
 
+class ProtocolWriter
+{
+public:
+    uint8_t* wrap_header_buffer(u_int16_t serial_number, std::string data)
+    {
+        uint8_t* buf = new uint8_t[HEADER_SIZE + data.length()]();
+        // MOGO
+        buf[0] = 'M';
+        buf[1] = 'O';
+        buf[2] = 'G';
+        buf[3] = 'O';
+
+        // Version
+        buf[4] = 0x01;
+
+        // Serialization Method
+        buf[5] = 0x01;
+
+        // Command
+        // HEART:   0
+        // AUTH:    1
+        // MOVE:    2
+        // QUERY:   3
+        buf[6] = 0x01;
+
+        // Serial Number
+        buf[7] = static_cast<uint8_t>((serial_number >> 8) & 0xFF);
+        buf[8] = static_cast<uint8_t>(serial_number & 0xFF);
+
+        // data length
+        uint32_t number = data.length();
+        intToBytes(number, &buf[9]);
+
+        memcpy(buf+HEADER_SIZE, data.c_str(), data.length());
+
+        return buf;
+    }
+
+    void intToBytes(uint32_t value, uint8_t bytes[4])
+    {
+        bytes[0] = static_cast<uint8_t>((value >> 24) & 0xFF);
+        bytes[1] = static_cast<uint8_t>((value >> 16) & 0xFF);
+        bytes[2] = static_cast<uint8_t>((value >> 8) & 0xFF);
+        bytes[3] = static_cast<uint8_t>(value & 0xFF);
+    }
+};
 
 #endif // PROTOCOL_H

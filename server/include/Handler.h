@@ -7,6 +7,7 @@
 class Message {
 public:
     int fd;
+    ProtocolHeader* header;
     std::string text; 
 };
 
