@@ -4,6 +4,7 @@
 #include <string>
 #include <cstring>
 #include "protocol.h"
+#include "ring_buffer.h"
 
 /*
 自定义网络协议的协议头设计需要兼顾高效性、可扩展性和安全性，通常包含以下核心字段：
@@ -173,7 +174,8 @@ public:
         // AUTH:    1
         // MOVE:    2
         // QUERY:   3
-        buf[6] = 0x01;
+        // COMMAND_BUSSNESS:   4
+        buf[6] = 0x04;
 
         // Serial Number
         buf[7] = static_cast<uint8_t>((serial_number >> 8) & 0xFF);

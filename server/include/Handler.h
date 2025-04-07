@@ -3,6 +3,7 @@
 
 
 #include <string>
+#include "protocol.h"
 
 class Message {
 public:

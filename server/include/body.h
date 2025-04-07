@@ -41,5 +41,11 @@ struct Room
 };
 NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(Room, id, players)
 
+struct SignInResponse
+{
+    std::string token;
+};
+NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(SignInResponse, token)
+
 
 #endif // BODY_H

@@ -9,34 +9,41 @@
 #include "db_utils.h"
 #include "protocol.h"
 
-
-int writeResponse(Message& msg, Response response)
+int writeResponse(Message &msg, Response response)
 {
     nlohmann::json j = response;
     std::string json = j.dump();
 
-    ProtocolWriter pw; 
-    u_int8_t* buf = pw.wrap_header_buffer(msg.header->serial_number, json);
-    Write(msg.fd, buf, HEADER_SIZE+json.length());
+    ProtocolWriter pw;
+    u_int8_t *buf = pw.wrap_header_buffer(msg.header->serial_number, json);
+    Write(msg.fd, buf, HEADER_SIZE + json.length());
     return 0;
 }
 
-int do_sign_in(Message& msg, Request request)
+int do_sign_in(Message &msg, Request request)
 {
-    std::optional<User> user = check_token(request.data);
-    if (!user)
+    try
     {
-        return 0;
-    }
-    // 创建token
-    std::string token = generate_jwt(std::to_string(user->id));
-    writeResponse(msg, Response{200, "xxsign_in success", token});
+        std::string http_token = request.data["token"].get<std::string>();
+        std::optional<User> user = check_token(http_token);
+        if (!user)
+        {
+            return 0;
+        }
+        // 创建token
+        SignInResponse resp;
+        resp.token = generate_jwt(std::to_string(user->id));
+        writeResponse(msg, Response{200, "sign_in success", resp});
 
-    Log::info("Core::run() sign_in success");
+        Log::info("Core::run() sign_in success");
+    } catch (const std::exception &e)
+    {
+        std::cerr << "其他错误: " << e.what() << std::endl;
+    }
     return 1;
 }
 
-int do_get_room_list(Message& msg, Request request)
+int do_get_room_list(Message &msg, Request request)
 {
     Response resp;
     resp.code = 200;
@@ -53,7 +60,7 @@ int do_get_room_list(Message& msg, Request request)
     return 0;
 }
 
-int do_create_room(Message& msg, Request request)
+int do_create_room(Message &msg, Request request)
 {
     Room room;
     auto now = std::chrono::system_clock::now();
@@ -69,20 +76,26 @@ int do_create_room(Message& msg, Request request)
     return 0;
 }
 
-int do_enter_room(Message& msg, Request request)
+int do_enter_room(Message &msg, Request request)
 {
-    try{
+    try
+    {
         std::string room_id = request.data["room_id"].get<std::string>();
         Room room = g_rooms[room_id];
         std::string user_id = extract_user_id(request.token);
-        Player* p = query_user(user_id);
-        if (p) {
+        Player *p = query_user(user_id);
+        if (p)
+        {
             room.players.push_back(*p);
             writeResponse(msg, Response{200, "enter_room success", room});
-        } else {
+        }
+        else
+        {
             writeResponse(msg, Response{400, "enter_room failed", {}});
         }
-    } catch (const std::exception& e) {
+    }
+    catch (const std::exception &e)
+    {
         std::cerr << "其他错误: " << e.what() << std::endl;
     }
     return 0;
@@ -94,22 +107,27 @@ int Core::run(Message &msg)
 
     // 1. json转成对象
     Request request;
-    try {
+    try
+    {
         nlohmann::json j = nlohmann::json::parse(msg.text);
         request = j.get<Request>();
         std::cout << "解析成功: " << j.dump(2) << std::endl;
 
-        if (request.token.length() > 0) {
+        if (request.token.length() > 0)
+        {
             std::string user_id = extract_user_id(request.token);
             std::cout << "core::run() user_id: " << user_id << std::endl;
         }
-    } catch (const nlohmann::json::parse_error& e) {
+    }
+    catch (const nlohmann::json::parse_error &e)
+    {
         std::cerr << "JSON 解析错误: " << e.what() << std::endl;
         std::cerr << "错误位置: 字节 " << e.byte << std::endl;
-    } catch (const std::exception& e) {
+    }
+    catch (const std::exception &e)
+    {
         std::cerr << "其他错误: " << e.what() << std::endl;
     }
-
 
     if (mState == UNAUTH)
     {
@@ -123,7 +141,9 @@ int Core::run(Message &msg)
                 return 0;
             }
             mState = FREE;
-        } else {
+        }
+        else
+        {
             if (request.action == "sign_in")
             {
                 do_sign_in(msg, request);
