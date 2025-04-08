@@ -20,6 +20,14 @@ public:
     struct sockaddr_in clientaddr;
     RingBuffer* ringBuffer;
     Core* core;
+
+    Client() {
+
+    }
+
+    ~Client() {
+
+    }
 };
 
 static std::map<int, Client> clientMap;

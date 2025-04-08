@@ -20,7 +20,7 @@ int writeResponse(Message &msg, Response response)
     return 0;
 }
 
-int do_sign_in(Message &msg, Request request)
+int do_sign_in(Message &msg, Request &request, Core& core)
 {
     try
     {
@@ -35,15 +35,18 @@ int do_sign_in(Message &msg, Request request)
         resp.token = generate_jwt(std::to_string(user->id));
         writeResponse(msg, Response{200, "sign_in success", resp});
 
+        core.on_auth_success(resp.token);
+
         Log::info("Core::run() sign_in success");
-    } catch (const std::exception &e)
+    }
+    catch (const std::exception &e)
     {
         std::cerr << "其他错误: " << e.what() << std::endl;
     }
     return 1;
 }
 
-int do_get_room_list(Message &msg, Request request)
+int do_get_room_list(Message &msg, Request &request)
 {
     Response resp;
     resp.code = 200;
@@ -60,7 +63,7 @@ int do_get_room_list(Message &msg, Request request)
     return 0;
 }
 
-int do_create_room(Message &msg, Request request)
+int do_create_room(Message &msg, Request &request)
 {
     Room room;
     auto now = std::chrono::system_clock::now();
@@ -76,7 +79,7 @@ int do_create_room(Message &msg, Request request)
     return 0;
 }
 
-int do_enter_room(Message &msg, Request request)
+int do_enter_room(Message &msg, Request &request)
 {
     try
     {
@@ -99,6 +102,51 @@ int do_enter_room(Message &msg, Request request)
         std::cerr << "其他错误: " << e.what() << std::endl;
     }
     return 0;
+}
+
+int do_get_room_info(Message &msg, Request &request)
+{
+    try
+    {
+        std::string room_id = request.data["room_id"].get<std::string>();
+        Room room = g_rooms[room_id];
+        writeResponse(msg, Response{200, "success", {room}});
+    }
+    catch (const std::exception &e)
+    {
+        std::cerr << "其他错误: " << e.what() << std::endl;
+    }
+    return 0;
+}
+
+// 0.客户端发送，匹配申请，服务端回复ok 最长等待30秒，客户端显示进度条,等待服务器推送
+// 1.服务器先遍历申请人队列，如果有同级别的人，则匹配成功。
+// 如果申请人队列没匹配成功，则遍历player列表, 向同级别的player申请对局
+// 对方发送同意，则匹配成功
+int do_match_player(Message &msg, Request &request)
+{
+    try
+    {
+        writeResponse(msg, Response{200, "success", {MatchPlayerResponse{30}}});
+    }
+    catch (const std::exception &e)
+    {
+        std::cerr << "其他错误: " << e.what() << std::endl;
+    }
+    return 0;
+}
+
+void Core::on_auth_success(std::string token)
+{
+    std::string user_id = extract_user_id(token);
+    Player *p = query_user(user_id);
+    if (p == NULL)
+    {
+        std::cerr << "p == NULL" << std::endl;
+        return;
+    }
+    userId = user_id;
+    g_players.insert({p->id, *p});
 }
 
 int Core::run(Message &msg)
@@ -140,13 +188,14 @@ int Core::run(Message &msg)
                 writeResponse(msg, Response{401, "token is invalid", {}});
                 return 0;
             }
+            on_auth_success(request.token);
             mState = FREE;
         }
         else
         {
             if (request.action == "sign_in")
             {
-                do_sign_in(msg, request);
+                do_sign_in(msg, request, *this);
                 mState = FREE;
                 return 0;
             }
@@ -174,6 +223,10 @@ int Core::run(Message &msg)
         {
             do_enter_room(msg, request);
         }
+        else if (request.action == "match_player")
+        {
+            do_match_player(msg, request);
+        }
         else if (request.action == "get_online_player_list")
         {
         }
@@ -193,13 +246,24 @@ int Core::run(Message &msg)
         {
         }
     }
-    else if (mState == IN_ROOM)
+    else if (mState == IN_ROOM) // 观战状态
     {
         // match
         // cancel_matching
         // leave_room
+        if (!validate_jwt(request.token))
+        {
+            Log::error("Core::run() token is invalid");
+            writeResponse(msg, Response{401, "token is invalid", {}});
+            return 0;
+        }
+
+        if (request.action == "get_room_info")
+        {
+            do_get_room_info(msg, request);
+        }
     }
-    else if (mState == GAMING)
+    else if (mState == GAMING) // 下棋中
     {
         // admit_defeat
         // move

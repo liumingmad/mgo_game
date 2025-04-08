@@ -2,6 +2,7 @@
 #define CORE_H
 
 #include <iostream>
+#include <string>
 
 #include "Log.h"
 #include "Handler.h"
@@ -44,6 +45,7 @@ private:
 
     CoreState mState;
     GameState mGameState;
+    std::string userId;
 
 public:
     Core(){
@@ -53,6 +55,7 @@ public:
     ~Core(){}
 
     int run(Message& msg);
+    void on_auth_success(std::string token);
 };
 
 #endif // CORE_H

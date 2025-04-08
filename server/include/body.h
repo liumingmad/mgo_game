@@ -29,8 +29,9 @@ struct Player
     std::string id;
     std::string name;
     int level;
+    int online;
 };
-NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(Player, id, name, level)
+NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(Player, id, name, level, online)
 
 
 struct Room
@@ -48,4 +49,9 @@ struct SignInResponse
 NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(SignInResponse, token)
 
 
+struct MatchPlayerResponse
+{
+    int waiting_seconds;
+};
+NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(MatchPlayerResponse, waiting_seconds)
 #endif // BODY_H
