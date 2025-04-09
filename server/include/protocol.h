@@ -154,7 +154,7 @@ public:
 class ProtocolWriter
 {
 public:
-    uint8_t* wrap_header_buffer(u_int16_t serial_number, std::string data)
+    uint8_t* wrap_push_header_buffer(u_int16_t serial_number, std::string data)
     {
         uint8_t* buf = new uint8_t[HEADER_SIZE + data.length()]();
         // MOGO
@@ -175,6 +175,44 @@ public:
         // MOVE:    2
         // QUERY:   3
         // COMMAND_BUSSNESS:   4
+        // COMMAND_SERVER_PUSH 5
+        buf[6] = 0x05;
+
+        // Serial Number
+        buf[7] = static_cast<uint8_t>((serial_number >> 8) & 0xFF);
+        buf[8] = static_cast<uint8_t>(serial_number & 0xFF);
+
+        // data length
+        uint32_t number = data.length();
+        intToBytes(number, &buf[9]);
+
+        memcpy(buf+HEADER_SIZE, data.c_str(), data.length());
+
+        return buf;
+    }
+
+    uint8_t* wrap_response_header_buffer(u_int16_t serial_number, std::string data)
+    {
+        uint8_t* buf = new uint8_t[HEADER_SIZE + data.length()]();
+        // MOGO
+        buf[0] = 'M';
+        buf[1] = 'O';
+        buf[2] = 'G';
+        buf[3] = 'O';
+
+        // Version
+        buf[4] = 0x01;
+
+        // Serialization Method
+        buf[5] = 0x01;
+
+        // Command
+        // HEART:   0
+        // AUTH:    1
+        // MOVE:    2
+        // QUERY:   3
+        // COMMAND_BUSSNESS:   4
+        // COMMAND_SERVER_PUSH 5
         buf[6] = 0x04;
 
         // Serial Number

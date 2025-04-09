@@ -8,6 +8,7 @@
 #include "global.h"
 #include "db_utils.h"
 #include "protocol.h"
+#include <auto_match.h>
 
 int writeResponse(Message &msg, Response response)
 {
@@ -15,9 +16,15 @@ int writeResponse(Message &msg, Response response)
     std::string json = j.dump();
 
     ProtocolWriter pw;
-    u_int8_t *buf = pw.wrap_header_buffer(msg.header->serial_number, json);
+    u_int8_t *buf = pw.wrap_response_header_buffer(msg.header->serial_number, json);
     Write(msg.fd, buf, HEADER_SIZE + json.length());
     return 0;
+}
+
+int server_push(int fd, std::string message) {
+    ProtocolWriter pw;
+    u_int8_t *buf = pw.wrap_push_header_buffer(g_push_serial_number, message);
+    Write(fd, buf, HEADER_SIZE + message.length());
 }
 
 int do_sign_in(Message &msg, Request &request, Core& core)
@@ -127,7 +134,18 @@ int do_match_player(Message &msg, Request &request)
 {
     try
     {
-        writeResponse(msg, Response{200, "success", {MatchPlayerResponse{30}}});
+        writeResponse(msg, Response{200, "success, please waitting 30s", MatchPlayerResponse{30}});
+
+        Player* me = new Player();
+
+        // 先快速匹配
+        AutoPlayerMatcher& matcher = AutoPlayerMatcher::getInstance();
+        Player* p = matcher.auto_match(request.data["level"]);
+        if (p == NULL) {
+            matcher.enqueue_waitting(*me);
+        }
+        server_push(msg.fd, "");
+
     }
     catch (const std::exception &e)
     {
