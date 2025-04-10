@@ -14,7 +14,7 @@ Player* query_user(std::string id) {
     {
         auto conn = DBConnectionPool::getInstance()->getConnection();
         std::unique_ptr<sql::Statement> stmt(conn->createStatement());
-        std::string sql = "SELECT id, username FROM users WHERE id=" + id + ";";
+        std::string sql = "SELECT id, username, level FROM users WHERE id=" + id + ";";
         std::unique_ptr<sql::ResultSet> res(stmt->executeQuery(sql));
         while (res->next())
         {

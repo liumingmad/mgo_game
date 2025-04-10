@@ -129,13 +129,15 @@ int Server::handle_request(int fd) {
         }
 
         // 2.解析协议头
-        ProtocolHeader* header = parser.parse_header(buf, HEADER_SIZE);
+        ProtocolHeader* header = parser.parse_header(rb, HEADER_SIZE);
 
         // 3.把数据放入Message, 交给线程池处理
+        char tmp[len];
+        rb->peek(tmp, len);
         Message* msg = new Message();
         msg->fd = fd;
         msg->header = header;
-        msg->text = std::string(buf+HEADER_SIZE, header->data_length);
+        msg->text = std::string(tmp+HEADER_SIZE, header->data_length);
         pool.submit(handle_message, msg);
 
         // 4. 删除处理过的数据

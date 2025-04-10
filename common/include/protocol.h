@@ -90,15 +90,15 @@ public:
     }
 
     // 检测ringbuffer里是否包含一个完整的协议, 如果存在，返回长度，不存在返回0
-    int exist_one_protocol(RingBuffer *buf)
+    int exist_one_protocol(RingBuffer *rb)
     {
-        if (buf->get_size() < HEADER_SIZE)
+        if (rb->get_size() < HEADER_SIZE)
         {
             return 0;
         }
 
         char tmp[HEADER_SIZE];
-        buf->peek(tmp, HEADER_SIZE);
+        rb->peek(tmp, HEADER_SIZE);
 
         // magic_number
         if (memcmp(tmp, MAGIC_NUMBER, strlen(MAGIC_NUMBER)) != 0)
@@ -109,7 +109,7 @@ public:
         // data_length
         size_t data_len = (tmp[9] << 24) | (tmp[10] << 16) | (tmp[11] << 8) | tmp[12];
         int proc_len = HEADER_SIZE + data_len;
-        if (proc_len > buf->get_size())
+        if (proc_len > rb->get_size())
         {
             return false;
         }
@@ -117,12 +117,15 @@ public:
         return proc_len;
     }
 
-    ProtocolHeader *parse_header(char *buf, int len)
+    ProtocolHeader *parse_header(RingBuffer *rb, int len)
     {
         if (len < HEADER_SIZE)
         {
             return nullptr;
         }
+
+        char buf[HEADER_SIZE];
+        rb->peek(buf, HEADER_SIZE);
 
         // magic_number
         if (memcmp(buf, MAGIC_NUMBER, 4) != 0)

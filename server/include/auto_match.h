@@ -26,6 +26,8 @@ class AutoPlayerMatcher
     void enqueue_waitting(Player& p) {
         std::lock_guard<std::mutex> lock(mtx);
         clean_invalid_player(&p);
+
+        p.mills = getMilliseconds(); 
         queue.push_back(p);
     }
 
@@ -39,7 +41,7 @@ class AutoPlayerMatcher
 
         // 先筛选出同级别的，然后再匹配相邻级别
         for (auto it=queue.begin(); it!=queue.end(); it++) {
-            if (mills > p->mills + 3000) continue;
+            if (mills > it->mills + 3000) continue;
             if (it->level != level) continue;
             p = &(*it);
             break;
@@ -47,7 +49,7 @@ class AutoPlayerMatcher
 
         if (p == NULL) {
             for (auto it=queue.begin(); it!=queue.end(); it++) {
-                if (mills > p->mills + 3000) continue;
+                if (mills > it->mills + 3000) continue;
                 if (it->level == level + 1 || it->level == level - 1) {
                     p = &(*it);
                     break;
@@ -62,9 +64,11 @@ class AutoPlayerMatcher
 
     int clean_invalid_player(Player* deletePlayer) {
         long mills = getMilliseconds();
-        for (auto it=queue.begin(); it!=queue.end(); it++) {
+        for (auto it=queue.begin(); it!=queue.end(); ) {
             if (&(*it) == deletePlayer || mills > it->mills + 3000) {
                 queue.erase(it);
+            } else {
+                it++;
             }
         }
     }

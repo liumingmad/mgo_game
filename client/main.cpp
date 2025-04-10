@@ -1,5 +1,6 @@
 #include <iostream>
 #include "client.h"
+#include "protocol.h"
 
 
 int32_t bytesToInt(const uint8_t bytes[4]) {
@@ -47,6 +48,36 @@ void write_buffer(uint8_t* buf, int data_len)
     
 }
 
+void read_procotol(MgoClient client) {
+    char buf[512] = { 0 };
+    int n = client.socket_read(buf);
+    if (n == 0) {
+        return;
+    }
+
+    // 查看ringbuffer中是否残存数据, 如果存在，就沾包
+    RingBuffer* rb = new RingBuffer(128*1024);
+    rb->push(buf, n);
+
+    ProtocolParser parser;
+    while (true) {
+        // 1.在buffer中，检查是否存在一条完整的协议, 返回协议的全长
+        size_t len = parser.exist_one_protocol(rb);
+        if (len == 0) {
+            break;
+        }
+
+        ProtocolHeader* header = parser.parse_header(rb, HEADER_SIZE);
+        char tmp[len];
+        rb->peek(tmp, len);
+        std::string str = std::string(tmp+HEADER_SIZE, header->data_length);
+        std::cout << str << std::endl;
+
+        // 4. 删除处理过的数据
+        rb->pop(nullptr, len);
+    }
+}
+
 void run_client()
 {
     MgoClient client;
@@ -54,7 +85,7 @@ void run_client()
     client.socket_connect();
 
     char message[512] = { 0 };
-    char buf[512] = { 0 };
+    
     while (true) {
         memset(message, 0, 512);
 
@@ -63,12 +94,13 @@ void run_client()
         write_buffer(reinterpret_cast<uint8_t*>(message), data_len);
         client.socket_write(message, data_len+13);
 
+        // read
+        read_procotol(client);
 
-        int len = client.socket_read(buf);
-        std::cout << len-13 << ":" << (buf+13) << std::endl;
     }
     client.socket_close();
 }
+
 
 int test_intToBytes() {
     int32_t number = 123456789;
