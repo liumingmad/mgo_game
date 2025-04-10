@@ -8,7 +8,9 @@
 #include "global.h"
 #include "db_utils.h"
 #include "protocol.h"
-#include <auto_match.h>
+#include "auto_match.h"
+#include <sw/redis++/redis++.h>
+#include <redis_pool.h>
 
 int writeResponse(Message &msg, Response response)
 {
@@ -35,6 +37,7 @@ int do_sign_in(Message &msg, Request &request, Core& core)
         std::optional<User> user = check_token(http_token);
         if (!user)
         {
+            writeResponse(msg, Response{400, "sign_in fail, token invalid", {}});
             return 0;
         }
         // 创建token
@@ -136,15 +139,23 @@ int do_match_player(Message &msg, Request &request)
     {
         writeResponse(msg, Response{200, "success, please waitting 30s", MatchPlayerResponse{30}});
 
-        Player* me = new Player();
+        // 从缓存中找自己的Player
+        std::string user_id = extract_user_id(request.token);
+        Player& me = g_players[user_id];
 
-        // 先快速匹配
+        // 0.先快速匹配
         AutoPlayerMatcher& matcher = AutoPlayerMatcher::getInstance();
         Player* p = matcher.auto_match(request.data["level"]);
         if (p == NULL) {
-            matcher.enqueue_waitting(*me);
+            matcher.enqueue_waitting(me);
         }
-        server_push(msg.fd, "");
+
+        // 1. 找到对手p后，创建room，
+        // 2. 把me和p加入到room
+        // 3. 开启对弈模式, 启动计时器，切换状态机等
+
+        // 4. 给两个人分别推送一条消息, 客户端之间跳转到room page开始下棋
+        server_push(msg.fd, R"({"name": "ming"})");
 
     }
     catch (const std::exception &e)
@@ -156,13 +167,30 @@ int do_match_player(Message &msg, Request &request)
 
 void Core::on_auth_success(std::string token)
 {
+    const Player *p;
+
     std::string user_id = extract_user_id(token);
-    Player *p = query_user(user_id);
-    if (p == NULL)
-    {
-        std::cerr << "p == NULL" << std::endl;
-        return;
+    const std::string key_user_id = KEY_USER_PREFIX + user_id;
+
+    Redis& redis = RedisPool::getInstance().getRedis();
+    auto player = redis.get(key_user_id);
+
+    if (player) {
+        nlohmann::json j = nlohmann::json::parse(*player);
+        const Player& tmp = j.get<Player>();
+        p = &tmp;
+
+    } else {
+        p = query_user(user_id);
+        if (p == NULL)
+        {
+            std::cerr << "p == NULL" << std::endl;
+            return;
+        }
+        nlohmann::json j = *p;
+        redis.set(key_user_id, j.dump());
     }
+
     userId = user_id;
     g_players.insert({p->id, *p});
 }

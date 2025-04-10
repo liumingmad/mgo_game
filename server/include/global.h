@@ -8,6 +8,10 @@
 #include "body.h"
 
 
+// redis key prefix
+const std::string KEY_USER_PREFIX = "user_id_";
+
+
 std::map<std::string, Player> g_players;
 
 std::map<std::string, Room> g_rooms;

@@ -6,13 +6,13 @@
 #include <mysql_connection.h>
 #include <cppconn/statement.h>
 #include <cppconn/resultset.h>
-#include "connection_pool.h"
+#include "db_connection_pool.h"
 #include "global.h"
 Player* query_user(std::string id) {
     Player* player = new Player();
     try
     {
-        auto conn = ConnectionPool::getInstance()->getConnection();
+        auto conn = DBConnectionPool::getInstance()->getConnection();
         std::unique_ptr<sql::Statement> stmt(conn->createStatement());
         std::string sql = "SELECT id, username FROM users WHERE id=" + id + ";";
         std::unique_ptr<sql::ResultSet> res(stmt->executeQuery(sql));
@@ -21,6 +21,7 @@ Player* query_user(std::string id) {
             std::cout << "ID: " << res->getInt("id") << ", Name: " << res->getString("username") << std::endl;
             player->id = res->getInt("id");
             player->name = res->getString("username");
+            player->level = res->getInt("level");
         }
     }
     catch (sql::SQLException &e)

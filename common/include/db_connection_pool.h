@@ -9,10 +9,10 @@
 #include <mysql_driver.h>
 #include <mysql_connection.h>
 
-class ConnectionPool {
+class DBConnectionPool {
 public:
-    static ConnectionPool* getInstance() {
-        static ConnectionPool instance;
+    static DBConnectionPool* getInstance() {
+        static DBConnectionPool instance;
         return &instance;
     }
 
@@ -49,8 +49,8 @@ public:
     }
 
 private:
-    ConnectionPool() = default;
-    ~ConnectionPool() {
+    DBConnectionPool() = default;
+    ~DBConnectionPool() {
         while (!m_connections.empty()) {
             delete m_connections.front();
             m_connections.pop();

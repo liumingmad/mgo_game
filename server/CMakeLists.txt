@@ -19,7 +19,14 @@ add_library(server STATIC ${SRC_LIST})
 # 链接静态库和动态库
 find_package(OpenSSL REQUIRED)
 find_package(CURL REQUIRED)
-target_link_libraries(server PRIVATE OpenSSL::SSL OpenSSL::Crypto ${CURL_LIBRARIES} mysqlcppconn)
+target_link_libraries(server PRIVATE 
+    OpenSSL::SSL 
+    OpenSSL::Crypto 
+    ${CURL_LIBRARIES} 
+    mysqlcppconn
+    hiredis 
+    redis++
+    )
 
 target_link_libraries(server PRIVATE common board)
 
