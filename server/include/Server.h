@@ -9,6 +9,7 @@
 #include "Log.h"
 #include "ring_buffer.h"
 #include "core.h"
+#include "timer.h"
 
 #define MAX_CLIENT_SIZE 100
 constexpr size_t BUF_SIZE = 512;
@@ -34,7 +35,10 @@ static std::map<int, Client> clientMap;
 
 class Server {
 private:
-    ThreadPool pool;
+    ThreadPool m_pool;
+
+    // 全局定时器，每2s触发一次，用于所有正在进行的对局，触发超时认负
+    Timer m_timer;
 
 public:
     int init();

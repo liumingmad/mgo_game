@@ -14,6 +14,7 @@
 #include "core.h"
 #include "db_connection_pool.h"
 #include "redis_pool.h"
+#include <timer.h>
 
 int Server::init() {
     // 初始化数据库连接池
@@ -27,13 +28,18 @@ int Server::init() {
     RedisPool::getInstance().init();
 
     // 线程池
-    pool.init();
+    m_pool.init();
+
+    // 定时器
+    std::shared_ptr<GameTimerCallback> gameTimerCallback = std::make_shared<GameTimerCallback>();
+    m_timer.addListener(gameTimerCallback);
+    m_timer.start();
 
     return 0;
 }
 
 int Server::shutdown() {
-    pool.shutdown();
+    m_pool.shutdown();
     return 0;
 }
 
@@ -138,7 +144,7 @@ int Server::handle_request(int fd) {
         msg->fd = fd;
         msg->header = header;
         msg->text = std::string(tmp+HEADER_SIZE, header->data_length);
-        pool.submit(handle_message, msg);
+        m_pool.submit(handle_message, msg);
 
         // 4. 删除处理过的数据
         rb->pop(nullptr, len);

@@ -6,6 +6,7 @@
 
 #include "Log.h"
 #include "Handler.h"
+#include "body.h"
 
 class Core {
 private:
@@ -43,19 +44,29 @@ private:
         GAME_OVER,                  // 计时器暂停, 游戏结束
     };
 
-    CoreState mState;
-    GameState mGameState;
-    std::string userId;
+    CoreState m_state;
+    GameState m_game_state;
+    std::string m_user_id;
 
 public:
     Core(){
-        mState = UNAUTH;
+        m_state = UNAUTH;
     }
 
     ~Core(){}
 
+    // 基于应答的状态机
     int run(Message& msg);
     void on_auth_success(std::string token);
+    void do_sign_in(Message &msg, Request &request);
+    void do_get_room_list(Message &msg, Request &request);
+    void do_create_room(Message &msg, Request &request);
+    void do_enter_room(Message &msg, Request &request);
+    void do_match_player(Message &msg, Request &request);
+    void do_get_room_info(Message &msg, Request &request);
+
+    // 对弈进行中的的状态机
+    int gaming_run();
 };
 
 #endif // CORE_H

@@ -23,35 +23,36 @@ class AutoPlayerMatcher
     AutoPlayerMatcher(const AutoPlayerMatcher&) = delete;
     AutoPlayerMatcher& operator=(const AutoPlayerMatcher&) = delete;
 
-    void enqueue_waitting(Player& p) {
+    void enqueue_waitting(Player& self) {
         std::lock_guard<std::mutex> lock(mtx);
-        clean_invalid_player(&p);
+        clean_invalid_player(self);
 
-        p.mills = getMilliseconds(); 
-        queue.push_back(p);
+        self.mills = getMilliseconds(); 
+        queue.push_back(self);
     }
 
     // 传入发起人，返回对手, 如果没匹配到，就把p入队
-    Player* auto_match(int level)
+    std::optional<Player> auto_match(Player& self)
     {
         std::lock_guard<std::mutex> lock(mtx);
 
-        Player* p = NULL;
+        Player p;
         long mills = getMilliseconds();
 
         // 先筛选出同级别的，然后再匹配相邻级别
         for (auto it=queue.begin(); it!=queue.end(); it++) {
             if (mills > it->mills + 3000) continue;
-            if (it->level != level) continue;
-            p = &(*it);
+            if (it->level != self.level) continue;
+            if (it->id == self.id) continue; 
+            p = *it;
             break;
         }
 
-        if (p == NULL) {
+        if (p.id.empty()) {
             for (auto it=queue.begin(); it!=queue.end(); it++) {
                 if (mills > it->mills + 3000) continue;
-                if (it->level == level + 1 || it->level == level - 1) {
-                    p = &(*it);
+                if (it->level == self.level + 1 || it->level == self.level - 1) {
+                    p = *it;
                     break;
                 } 
             }
@@ -62,10 +63,10 @@ class AutoPlayerMatcher
         return p;
     }
 
-    int clean_invalid_player(Player* deletePlayer) {
+    int clean_invalid_player(Player& deletePlayer) {
         long mills = getMilliseconds();
         for (auto it=queue.begin(); it!=queue.end(); ) {
-            if (&(*it) == deletePlayer || mills > it->mills + 3000) {
+            if ((*it).id == deletePlayer.id || mills > it->mills + 3000) {
                 queue.erase(it);
             } else {
                 it++;

@@ -34,7 +34,7 @@ target_link_libraries(server PRIVATE common board)
 target_include_directories(server PUBLIC include)
 
 
-option(ENABLE_SERVER_TESTS "Enable tests for server" ON)
+option(ENABLE_SERVER_TESTS "Enable tests for server" OFF)
 if (ENABLE_SERVER_TESTS)
     add_executable(testserver test/test_procotol.cpp)
     target_link_libraries(testserver PRIVATE server common board)

@@ -31,9 +31,8 @@ struct Player
     int level;
     // 开始申请的时间戳
     long mills;
-    int online;
 };
-NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(Player, id, name, level, online)
+NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(Player, id, name, level)
 
 
 struct Room
