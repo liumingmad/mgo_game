@@ -40,6 +40,7 @@ struct Room
     std::string id;
     std::vector<Player> players;
     // Board board;
+    
 };
 NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(Room, id, players)
 

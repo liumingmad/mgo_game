@@ -14,7 +14,13 @@
 #include "core.h"
 #include "db_connection_pool.h"
 #include "redis_pool.h"
-#include <timer.h>
+#include "timer.h"
+#include "global.h"
+
+std::map<std::string, Player> g_players;
+std::map<std::string, Room> g_rooms;
+std::map<int, std::shared_ptr<Client>> clientMap;
+std::map<std::string, std::shared_ptr<Client>> uidClientMap;
 
 int Server::init() {
     // 初始化数据库连接池
@@ -25,7 +31,9 @@ int Server::init() {
         "mgo",
         5); // 初始连接数设为15
     
-    RedisPool::getInstance().init();
+    RedisPool& redisPool = RedisPool::getInstance();
+    redisPool.init();
+    redisPool.getRedis().flushall();
 
     // 线程池
     m_pool.init();
@@ -92,7 +100,7 @@ int Server::run(int port)
                     add_client(clientfd, clientaddr);
 
                 } else {
-                    if (handle_request(fd) == 0) {
+                    if (handle_request(clientMap[fd]) == 0) {
                         Epoll_ctl(epfd, EPOLL_CTL_DEL, fd, &ev);
                         Close(fd);
                         remove_client(fd);
@@ -114,16 +122,16 @@ int writeResponse(int fd, std::string response)
     return 0;
 }
 
-int Server::handle_request(int fd) {
+int Server::handle_request(std::shared_ptr<Client> client) {
     char buf[BUF_SIZE];
     bzero(buf, BUF_SIZE);
-    int n = Read(fd, buf, BUF_SIZE);
+    int n = Read(client->fd, buf, BUF_SIZE);
     if (n == 0) {
         return 0;
     }
 
     // 查看ringbuffer中是否残存数据, 如果存在，就沾包
-    RingBuffer* rb = clientMap[fd].ringBuffer;
+    RingBuffer* rb = client->ringBuffer;
     rb->push(buf, n);
 
     ProtocolParser parser;
@@ -141,14 +149,16 @@ int Server::handle_request(int fd) {
         char tmp[len];
         rb->peek(tmp, len);
         Message* msg = new Message();
-        msg->fd = fd;
+        msg->fd = client->fd;
         msg->header = header;
         msg->text = std::string(tmp+HEADER_SIZE, header->data_length);
-        m_pool.submit(handle_message, msg);
+        client->queue.enqueue(*msg);
 
         // 4. 删除处理过的数据
         rb->pop(nullptr, len);
     }
+
+    m_pool.submit(handle_message, client);
 
     // 清理无效数据
     parser.clear_invalid_data(rb);
@@ -156,20 +166,24 @@ int Server::handle_request(int fd) {
     return n;
 }
 
-void handle_message(Message* msg) {
-    // writeResponse(msg->fd, "server:" + msg->text + "\n");
-    Core* core = clientMap[msg->fd].core;
-    core->run(*msg);
-
-    // TODO:delete Message
+void handle_message(std::shared_ptr<Client> client) {
+    // 加锁的原因是，不想让多个线程同时处理一个连接的消息
+    std::unique_lock<std::mutex> lock(client->mutex);
+    SafeQueue<Message>& queue = client->queue;
+    while (!queue.empty()) {
+        Message msg;
+        if (queue.dequeue(msg)) {
+            client->core->run(msg);
+        }
+    }
 }
 
-void printMap(std::map<int, Client> map) {
-    std::map<int, Client>::iterator it = map.begin();
+void printMap(std::map<int, std::shared_ptr<Client>> map) {
+    std::map<int, std::shared_ptr<Client>>::iterator it = map.begin();
     while(it != map.end()) {
         int fd = it->first;
-        Client cli = it->second;
-        std::cout << fd << ", " << cli.fd << std::endl;
+        std::shared_ptr<Client> cli = it->second;
+        std::cout << fd << ", " << cli->fd << std::endl;
         it++;
     }
 }
@@ -177,12 +191,10 @@ void printMap(std::map<int, Client> map) {
 int Server::add_client(int fd, struct sockaddr_in addr) {
     std::cout << "add client " << fd << std::endl;
 
-    Client* client = new Client();
+    std::shared_ptr<Client> client = std::make_shared<Client>();
     client->fd = fd;
     client->clientaddr = addr;
-    client->ringBuffer = new RingBuffer(RING_BUFFER_SIZE);
-    client->core = new Core();
-    clientMap[fd] = *client;
+    clientMap.insert({fd, client});
     // printMap(clientMap);
 
     return 0;
@@ -190,10 +202,23 @@ int Server::add_client(int fd, struct sockaddr_in addr) {
 
 int Server::remove_client(int fd) {
     std::cout << "remove client " << fd << std::endl;
+
+    std::shared_ptr<Client> client = clientMap[fd];
+    std::string user_id = client->user_id;
+
+    if (!user_id.empty()) {
+        // 删除user_id和client的对应关系
+        uidClientMap.erase(client->user_id);
+
+        // 清除redis缓存
+        const std::string key_user_id = KEY_USER_PREFIX + user_id;
+        Redis &redis = RedisPool::getInstance().getRedis();
+        redis.del(key_user_id);
+    }
+
     clientMap.erase(fd);
     // printMap(clientMap);
 
-    // TODO: delete Core
     return 0;
 }
 

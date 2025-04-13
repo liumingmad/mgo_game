@@ -12,6 +12,7 @@
 #include <sw/redis++/redis++.h>
 #include <redis_pool.h>
 #include <push_message.h>
+#include <server_push.h>
 
 int writeResponse(Message &msg, Response response)
 {
@@ -22,15 +23,6 @@ int writeResponse(Message &msg, Response response)
     u_int8_t *buf = pw.wrap_response_header_buffer(msg.header->serial_number, json);
     Write(msg.fd, buf, HEADER_SIZE + json.length());
     return 0;
-}
-
-int server_push(int fd, PushMessage message) {
-    nlohmann::json j = message;
-    std::string json = j.dump();
-
-    ProtocolWriter pw;
-    u_int8_t *buf = pw.wrap_push_header_buffer(g_push_serial_number, json);
-    Write(fd, buf, HEADER_SIZE + json.length());
 }
 
 void Core::do_sign_in(Message &msg, Request &request)
@@ -49,7 +41,7 @@ void Core::do_sign_in(Message &msg, Request &request)
         resp.token = generate_jwt(std::to_string(user->id));
         writeResponse(msg, Response{200, "sign_in success", resp});
 
-        this->on_auth_success(resp.token);
+        this->on_auth_success(msg.fd, resp.token);
 
         Log::info("Core::run() sign_in success");
     }
@@ -76,8 +68,9 @@ void Core::do_get_room_list(Message &msg, Request &request)
     writeResponse(msg, resp);
 }
 
-Room& create_room(std::string user_id) {
-    Room* room = new Room();
+Room &create_room(std::string user_id)
+{
+    Room *room = new Room();
     auto now = std::chrono::system_clock::now();
     auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(now.time_since_epoch());
     room->id = user_id + "_" + std::to_string(duration.count());
@@ -86,7 +79,7 @@ Room& create_room(std::string user_id) {
 
 void Core::do_create_room(Message &msg, Request &request)
 {
-    Room& room = create_room(m_user_id);
+    Room &room = create_room(m_user_id);
     g_rooms[room.id] = room;
 
     Response resp;
@@ -145,18 +138,19 @@ void Core::do_match_player(Message &msg, Request &request)
         writeResponse(msg, Response{200, "success, please waitting 30s", MatchPlayerResponse{30}});
 
         // 0. 从缓存中找自己的Player
-        Player& self = g_players[m_user_id];
+        Player &self = g_players[m_user_id];
 
         // 1. 找到对手, 从自动匹配队列中找
-        AutoPlayerMatcher& matcher = AutoPlayerMatcher::getInstance();
+        AutoPlayerMatcher &matcher = AutoPlayerMatcher::getInstance();
         std::optional<Player> opponent = matcher.auto_match(self);
-        if (!opponent.has_value()) {
+        if (!opponent.has_value())
+        {
             matcher.enqueue_waitting(self);
             return;
         }
 
         // 2. 找到对手p后，创建room，把me和p加入到room
-        Room& room = create_room(m_user_id);
+        Room &room = create_room(m_user_id);
         room.players.push_back(self);
         room.players.push_back(*opponent);
         g_rooms[room.id] = room;
@@ -165,18 +159,21 @@ void Core::do_match_player(Message &msg, Request &request)
         m_state = GAMING;
 
         // 5. 给两个人分别推送一条消息, 客户端之间跳转到room page开始下棋
+        ServerPusher& pusher = ServerPusher::getInstance();
         StartGameBody body;
         body.room = room;
         body.preTime = 5;
         body.readSecondCount = 3;
         body.moveTime = 60;
-        server_push(msg.fd, PushMessage{"start_game", {body}});
+        pusher.server_push(msg.fd, PushMessage{"start_game", {body}});
+
+        auto it = uidClientMap.find(opponent->id);
+        if (it != uidClientMap.end()) {
+            pusher.server_push(it->second->fd, PushMessage{"start_game", {body}});
+        }
 
         // 6. 推送后，客户端回复got it, 然后启动timer，切换到WAITTING_BLACK_MOVE
         m_game_state = WAITTING_BLACK_MOVE;
-
-
-
     }
     catch (const std::exception &e)
     {
@@ -184,22 +181,24 @@ void Core::do_match_player(Message &msg, Request &request)
     }
 }
 
-void Core::on_auth_success(std::string token)
+void Core::on_auth_success(int fd, std::string token)
 {
     const Player *p;
 
     std::string user_id = extract_user_id(token);
     const std::string key_user_id = KEY_USER_PREFIX + user_id;
 
-    Redis& redis = RedisPool::getInstance().getRedis();
+    Redis &redis = RedisPool::getInstance().getRedis();
     auto player = redis.get(key_user_id);
 
-    if (player) {
+    if (player.has_value())
+    {
         nlohmann::json j = nlohmann::json::parse(*player);
-        const Player& tmp = j.get<Player>();
+        const Player &tmp = j.get<Player>();
         p = &tmp;
-
-    } else {
+    }
+    else
+    {
         p = query_user(user_id);
         if (p == NULL)
         {
@@ -212,6 +211,10 @@ void Core::on_auth_success(std::string token)
 
     m_user_id = user_id;
     g_players.insert({p->id, *p});
+
+    std::shared_ptr<Client> client = clientMap[fd];
+    client->user_id = p->id;
+    uidClientMap.insert({p->id, client});
 }
 
 int Core::run(Message &msg)
@@ -224,7 +227,7 @@ int Core::run(Message &msg)
     {
         nlohmann::json j = nlohmann::json::parse(msg.text);
         request = j.get<Request>();
-        std::cout << "解析成功: " << j.dump(2) << std::endl;
+        std::cout << m_state << "解析成功: " << j.dump(2) << std::endl;
 
         if (request.token.length() > 0)
         {
@@ -253,7 +256,7 @@ int Core::run(Message &msg)
                 writeResponse(msg, Response{401, "token is invalid", {}});
                 return 0;
             }
-            on_auth_success(request.token);
+            on_auth_success(msg.fd, request.token);
             m_state = FREE;
         }
         else
@@ -287,10 +290,17 @@ int Core::run(Message &msg)
         else if (request.action == "enter_room")
         {
             do_enter_room(msg, request);
+        } 
+        else if (request.action == "get_room_info")
+        {
+            do_get_room_info(msg, request);
         }
         else if (request.action == "match_player")
         {
             do_match_player(msg, request);
+        }
+        else if (request.action == "cancel_matching")
+        {
         }
         else if (request.action == "find_player")
         {
@@ -310,9 +320,6 @@ int Core::run(Message &msg)
     }
     else if (m_state == IN_ROOM) // 观战状态
     {
-        // match
-        // cancel_matching
-        // leave_room
         if (!validate_jwt(request.token))
         {
             Log::error("Core::run() token is invalid");
@@ -320,38 +327,34 @@ int Core::run(Message &msg)
             return 0;
         }
 
-        if (request.action == "get_room_info")
-        {
-            do_get_room_info(msg, request);
+        if (request.action == "leave_room") {
+
         }
+
     }
     else if (m_state == GAMING) // 下棋中
     {
-        // 检查落子是否超时
-        // 如果超时没收到，则切换到Game over
-        if (m_game_state == WAITTING_BLACK_MOVE)
-        {
-            // 1. 第一步需要在10秒内落子，等待move消息，
-            // 2. 如果收到，转发给另一个人
-            // 3. 切换到WAITTING_WHITE_MOVE
-        }
-        else if (m_game_state == WAITTING_WHITE_MOVE)
-        {
-
-        }
-
-        if (m_game_state == PAUSE_OFFLINE)
-        {
-        }
-        else if (m_game_state == COUNTING_POINTS)
-        {
-        }
-        else if (m_game_state == GAME_OVER)
-        {
-        }
+        gaming_run();
     }
     else if (m_state == FINISH)
     {
     }
     return 0;
+}
+
+// 客户端发的消息，落子/点目申请/认输
+int Core::gaming_run()
+{
+    if (m_game_state == WAITTING_BLACK_MOVE)
+    {
+    }
+    else if (m_game_state == WAITTING_WHITE_MOVE)
+    {
+    }
+    else if (m_game_state == COUNTING_POINTS)
+    {
+    }
+    else if (m_game_state == GAME_OVER)
+    {
+    }
 }

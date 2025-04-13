@@ -1,4 +1,4 @@
-//thread_pool.h
+// thread_pool.h
 
 #ifndef THREAD_POOL_H
 #define THREAD_POOL_H
@@ -16,7 +16,7 @@ template <typename T>
 class SafeQueue
 {
 private:
-    std::queue<T> m_queue; //利用模板函数构造队列
+    std::queue<T> m_queue; // 利用模板函数构造队列
 
     std::mutex m_mutex; // 访问互斥信号量
 
@@ -38,7 +38,7 @@ public:
 
         return m_queue.size();
     }
-    
+
     // 队列添加元素
     void enqueue(T &t)
     {

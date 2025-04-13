@@ -40,7 +40,7 @@ private:
         PAUSE_OFFLINE,              // 计时器暂停, 对手掉线
         WAITTING_BLACK_MOVE,        // 计时器开启, 等待黑棋落子  
         WAITTING_WHITE_MOVE,        // 计时器开启, 等待白棋落子
-        COUNTING_POINTS,            // 计时器暂停, 等待对局结束, 计算棋盘点数
+        COUNTING_POINTS,            // 计时器暂停, 等待对方确认, 计算棋盘点数
         GAME_OVER,                  // 计时器暂停, 游戏结束
     };
 
@@ -57,7 +57,7 @@ public:
 
     // 基于应答的状态机
     int run(Message& msg);
-    void on_auth_success(std::string token);
+    void on_auth_success(int fd, std::string token);
     void do_sign_in(Message &msg, Request &request);
     void do_get_room_list(Message &msg, Request &request);
     void do_create_room(Message &msg, Request &request);

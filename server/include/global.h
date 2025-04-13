@@ -6,18 +6,22 @@
 #include <vector>
 
 #include "body.h"
+#include "Server.h"
 
 
 // redis key prefix
 const std::string KEY_USER_PREFIX = "user_id_";
 
 
-std::map<std::string, Player> g_players;
+// <user_id, Player>
+extern std::map<std::string, Player> g_players;
 
-std::map<std::string, Room> g_rooms;
+extern std::map<std::string, Room> g_rooms;
 
-// 服务器推送的序列号
-long g_push_serial_number = 1;
+// <fd, client>
+extern std::map<int, std::shared_ptr<Client>> clientMap;
+// <user_id, client>
+extern std::map<std::string, std::shared_ptr<Client>> uidClientMap;
 
 
 #endif // GLOBAL_H

@@ -10,6 +10,8 @@
 #include "ring_buffer.h"
 #include "core.h"
 #include "timer.h"
+#include "push_message.h"
+#include "server_push.h"
 
 #define MAX_CLIENT_SIZE 100
 constexpr size_t BUF_SIZE = 512;
@@ -21,34 +23,40 @@ public:
     struct sockaddr_in clientaddr;
     RingBuffer* ringBuffer;
     Core* core;
+    std::string user_id;
+
+    // 当执行queue中Message的过程中，不能执行队列中下一个
+    std::mutex mutex;
+    SafeQueue<Message> queue;
 
     Client() {
-
+        ringBuffer = new RingBuffer(RING_BUFFER_SIZE);
+        core = new Core();
     }
 
     ~Client() {
-
+        delete ringBuffer;
+        delete core;
     }
 };
 
-static std::map<int, Client> clientMap;
+
 
 class Server {
 private:
     ThreadPool m_pool;
 
     // 全局定时器，每2s触发一次，用于所有正在进行的对局，触发超时认负
-    Timer m_timer;
+    Timer m_timer{2000};
 
 public:
     int init();
     int run(int port);
-    int handle_request(int fd);
+    int handle_request(std::shared_ptr<Client> client);
     
     int add_client(int fd, struct sockaddr_in addr);
     int remove_client(int fd);
     int shutdown();
-
 };
 
 

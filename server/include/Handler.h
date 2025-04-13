@@ -2,7 +2,9 @@
 #define HANDLE_H
 
 
+#include <vector>
 #include <string>
+#include <memory>
 #include "protocol.h"
 
 class Message {
@@ -12,6 +14,7 @@ public:
     std::string text; 
 };
 
-void handle_message(Message* msg);
+class Client;
+void handle_message(std::shared_ptr<Client> client);
 
 #endif // HANDLE_H

@@ -32,7 +32,7 @@ private:
     std::vector<std::shared_ptr<TimerCallback>> m_listener_list;
 
 public:
-    Timer(const long durtion = 1000):m_drution(durtion)
+    Timer(const long durtion = 1000) : m_drution(durtion)
     {
     }
 
@@ -53,7 +53,7 @@ public:
     void start()
     {
         m_thread = std::thread([this]()
-                               {
+        {
             while (m_running) {
                 std::this_thread::sleep_for(std::chrono::milliseconds(m_drution));
                 for (const auto& callback : m_listener_list) {

@@ -23,6 +23,10 @@ public:
         this->size = 0;
     }
 
+    ~RingBuffer() {
+        delete buffer;
+    }
+
     size_t push(char *data, int len)
     {
         if (isFull()) {
