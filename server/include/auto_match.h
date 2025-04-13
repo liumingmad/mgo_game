@@ -38,10 +38,11 @@ class AutoPlayerMatcher
 
         Player p;
         long mills = getMilliseconds();
+        long DURATION = AUTO_MATCH_DURATION * 1000;
 
         // 先筛选出同级别的，然后再匹配相邻级别
         for (auto it=queue.begin(); it!=queue.end(); it++) {
-            if (mills > it->mills + 3000) continue;
+            if (mills > it->mills + DURATION) continue;
             if (it->level != self.level) continue;
             if (it->id == self.id) continue; 
             p = *it;
@@ -50,7 +51,7 @@ class AutoPlayerMatcher
 
         if (p.id.empty()) {
             for (auto it=queue.begin(); it!=queue.end(); it++) {
-                if (mills > it->mills + 3000) continue;
+                if (mills > it->mills + DURATION) continue;
                 if (it->level == self.level + 1 || it->level == self.level - 1) {
                     p = *it;
                     break;
@@ -58,15 +59,19 @@ class AutoPlayerMatcher
             }
         }
 
-        clean_invalid_player(p);
+        if (p.id.empty()) {
+            return std::nullopt;
+        }
 
+        clean_invalid_player(p);
         return p;
     }
 
     int clean_invalid_player(Player& deletePlayer) {
         long mills = getMilliseconds();
+        long DURATION = AUTO_MATCH_DURATION * 1000;
         for (auto it=queue.begin(); it!=queue.end(); ) {
-            if ((*it).id == deletePlayer.id || mills > it->mills + 3000) {
+            if ((*it).id == deletePlayer.id || mills > it->mills + DURATION) {
                 queue.erase(it);
             } else {
                 it++;

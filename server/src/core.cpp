@@ -135,7 +135,7 @@ void Core::do_match_player(Message &msg, Request &request)
 {
     try
     {
-        writeResponse(msg, Response{200, "success, please waitting 30s", MatchPlayerResponse{30}});
+        writeResponse(msg, Response{200, "success, please waitting 30s", MatchPlayerResponse{AUTO_MATCH_DURATION}});
 
         // 0. 从缓存中找自己的Player
         Player &self = g_players[m_user_id];
@@ -219,7 +219,7 @@ void Core::on_auth_success(int fd, std::string token)
 
 int Core::run(Message &msg)
 {
-    Log::info("----------------------------");
+    Log::info("\n\n----------------------------");
 
     // 1. json转成对象
     Request request;

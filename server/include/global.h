@@ -12,6 +12,9 @@
 // redis key prefix
 const std::string KEY_USER_PREFIX = "user_id_";
 
+// 30s
+const int AUTO_MATCH_DURATION = 30 * 200;
+
 
 // <user_id, Player>
 extern std::map<std::string, Player> g_players;

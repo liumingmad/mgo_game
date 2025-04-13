@@ -19,7 +19,7 @@ Player* query_user(std::string id) {
         while (res->next())
         {
             std::cout << "ID: " << res->getInt("id") << ", Name: " << res->getString("username") << std::endl;
-            player->id = res->getInt("id");
+            player->id = std::to_string(res->getInt("id"));
             player->name = res->getString("username");
             player->level = res->getInt("level");
         }
