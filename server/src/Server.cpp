@@ -42,7 +42,7 @@ int Server::init() {
     AsyncEventBus& bus = AsyncEventBus::getInstance();
     bus.start();
 
-    m_event_handler.init(bus);
+    m_event_handler.init();
 
     // 定时器
     std::shared_ptr<GameTimerCallback> gameTimerCallback = std::make_shared<GameTimerCallback>();
@@ -225,6 +225,8 @@ int Server::remove_client(int fd) {
 
     clientMap.erase(fd);
     // printMap(clientMap);
+
+    AsyncEventBus::getInstance().asyncPublish(EventHandler::EVENT_OFFLINE, user_id);
 
     return 0;
 }

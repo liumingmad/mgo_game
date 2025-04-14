@@ -225,7 +225,7 @@ void Core::on_auth_success(int fd, std::string token)
     client->user_id = p->id;
     uidClientMap.insert({p->id, client});
 
-    AsyncEventBus::getInstance().asyncPublish<std::string>("event_auth_success", user_id);
+    AsyncEventBus::getInstance().asyncPublish<std::string>(EventHandler::EVENT_ONLINE, user_id);
 }
 
 int Core::run(Message &msg)
