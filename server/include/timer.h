@@ -32,7 +32,7 @@ private:
     std::vector<std::shared_ptr<TimerCallback>> m_listener_list;
 
 public:
-    Timer(const long durtion = 1000) : m_drution(durtion)
+    Timer(const long durtion = 2000) : m_drution(durtion)
     {
     }
 

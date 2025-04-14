@@ -38,6 +38,12 @@ int Server::init() {
     // 线程池
     m_pool.init();
 
+    // 事件总线
+    AsyncEventBus& bus = AsyncEventBus::getInstance();
+    bus.start();
+
+    m_event_handler.init(bus);
+
     // 定时器
     std::shared_ptr<GameTimerCallback> gameTimerCallback = std::make_shared<GameTimerCallback>();
     m_timer.addListener(gameTimerCallback);
@@ -48,6 +54,7 @@ int Server::init() {
 
 int Server::shutdown() {
     m_pool.shutdown();
+    AsyncEventBus::getInstance().stop();
     return 0;
 }
 

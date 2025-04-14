@@ -12,6 +12,7 @@
 #include "timer.h"
 #include "push_message.h"
 #include "server_push.h"
+#include "event_handler.h"
 
 #define MAX_CLIENT_SIZE 100
 constexpr size_t BUF_SIZE = 512;
@@ -48,6 +49,8 @@ private:
 
     // 全局定时器，每2s触发一次，用于所有正在进行的对局，触发超时认负
     Timer m_timer{2000};
+
+    EventHandler m_event_handler;
 
 public:
     int init();

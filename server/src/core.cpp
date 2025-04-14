@@ -150,6 +150,15 @@ void Core::do_match_player(Message &msg, Request &request)
         }
 
         // 2. 找到对手p后，创建room，把me和p加入到room
+        int val = gen_random(0, 1);
+        if (val == 1) {
+            self.color = "B";
+            opponent->color = "W";
+        } else {
+            self.color = "W";
+            opponent->color = "B";
+        }
+
         Room &room = create_room(m_user_id);
         room.players.push_back(self);
         room.players.push_back(*opponent);
@@ -165,11 +174,11 @@ void Core::do_match_player(Message &msg, Request &request)
         body.preTime = 5;
         body.readSecondCount = 3;
         body.moveTime = 60;
-        pusher.server_push(msg.fd, PushMessage{"start_game", {body}});
+        pusher.server_push(msg.fd, PushMessage{"start_game", body});
 
         auto it = uidClientMap.find(opponent->id);
         if (it != uidClientMap.end()) {
-            pusher.server_push(it->second->fd, PushMessage{"start_game", {body}});
+            pusher.server_push(it->second->fd, PushMessage{"start_game", body});
         }
 
         // 6. 推送后，客户端回复got it, 然后启动timer，切换到WAITTING_BLACK_MOVE
@@ -215,6 +224,8 @@ void Core::on_auth_success(int fd, std::string token)
     std::shared_ptr<Client> client = clientMap[fd];
     client->user_id = p->id;
     uidClientMap.insert({p->id, client});
+
+    AsyncEventBus::getInstance().asyncPublish<std::string>("event_auth_success", user_id);
 }
 
 int Core::run(Message &msg)
@@ -347,6 +358,12 @@ int Core::gaming_run()
 {
     if (m_game_state == WAITTING_BLACK_MOVE)
     {
+        // 1. 通过room id获取room
+        // 2. 检查room状态，是否有人超时，或离线
+        // 3. 检查当前用户是否是执黑的player
+        // 4. 检查围棋规则
+        // 5. 推送落子到room内所有人
+
     }
     else if (m_game_state == WAITTING_WHITE_MOVE)
     {
