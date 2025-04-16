@@ -4,6 +4,7 @@
 #include <vector>
 #include "BitArray2D.h"
 #include "Node.h"
+#include "json.hpp"
 
 class Board
 {
@@ -20,17 +21,21 @@ public:
     void scanKilled(int player, BitArray2D& data, std::vector<Stone>& markList);
     void scanAndRemove(int player, BitArray2D& data, std::vector<Stone>& markList);
 
+    Board();
     Board(int w, int h);
     ~Board();
-    int getWidth();
-    int getHeight();
+    int getWidth() const;
+    int getHeight() const;
     int get(int x, int y);
     int move(int x, int y, char player);
     int score(char player);
-    Node& getCurrentNode();
+    Node& getCurrentNode() const;
+    Node& getRootNode() const;
 };
 
 
+void to_json(nlohmann::json& j, const Board& b);
+// void from_json(const nlohmann::json& j, Board& b);
 
 
 #endif // BOARD_H 

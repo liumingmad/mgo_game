@@ -32,7 +32,8 @@ struct Player
     // 开始申请的时间戳
     long mills;
     // B or W char code
-    std::string color;
+    // X is guest
+    std::string color = "X";
 
     // 上线和离线的时间点列表
     std::queue<long> active_time_list;
@@ -54,10 +55,10 @@ struct Room
     // 6: 对局结束
     int state;
 
-    // Board board;
+    Board board;
     
 };
-NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(Room, id, players, state)
+NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(Room, id, players, state, board)
 
 struct SignInResponse
 {

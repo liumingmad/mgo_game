@@ -48,19 +48,17 @@ void write_buffer(uint8_t* buf, int data_len)
     
 }
 
-void read_procotol(MgoClient client) {
-    char buf[512] = { 0 };
+void read_procotol(MgoClient client, RingBuffer* rb) {
+    char buf[4*1024] = { 0 };
     int n = client.socket_read(buf);
     if (n == 0) {
         return;
     }
 
-    // 查看ringbuffer中是否残存数据, 如果存在，就沾包
-    RingBuffer* rb = new RingBuffer(128*1024);
     rb->push(buf, n);
 
     ProtocolParser parser;
-    while (true) {
+    while (!rb->isEmpty()) {
         // 1.在buffer中，检查是否存在一条完整的协议, 返回协议的全长
         size_t len = parser.exist_one_protocol(rb);
         if (len == 0) {
@@ -83,6 +81,7 @@ void run_client()
     MgoClient client;
     client.socket_init("127.0.0.1", 9001);
     client.socket_connect();
+    RingBuffer* rb = new RingBuffer(128*1024);
 
     char message[512] = { 0 };
     
@@ -95,7 +94,7 @@ void run_client()
         client.socket_write(message, data_len+13);
 
         // read
-        read_procotol(client);
+        read_procotol(client, rb);
 
     }
     client.socket_close();

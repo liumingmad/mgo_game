@@ -1,6 +1,7 @@
 #include "event_handler.h"
 
-void onEventMove(const std::string move) {
+
+void onEventTMP(const std::string move) {
 }
 
 void onEventOnline(const std::string user_id) {
@@ -11,6 +12,8 @@ void onEventOffline(const std::string user_id) {
     std::cout << "onEventOffline() " << user_id << std::endl;
 }
 
+void onEventMove(const std::string move) {
+}
 
 // 客户端应该把room当作一个播放器
 // 当room状态发生变化时，把room的更新发送到房间内所有人
@@ -19,6 +22,7 @@ void onEventOffline(const std::string user_id) {
 // 1.落子 user
 // 2.上线 epool
 // 3.离线 epool
+
 // 4.数子 user
 // 5.认输 user
 // 6.有人进入房间 user
@@ -32,5 +36,12 @@ void EventHandler::init() {
     AsyncEventBus& bus = AsyncEventBus::getInstance();
     bus.subscribe<std::string>(EventHandler::EVENT_ONLINE, onEventOnline);
     bus.subscribe<std::string>(EventHandler::EVENT_OFFLINE, onEventOffline);
-    bus.subscribe<std::string>(EventHandler::EVENT_MOVE, onEventMove);
+    bus.subscribe<std::string>(EventHandler::EVENT_MOVE, onEventTMP);
+    bus.subscribe<std::string>(EventHandler::EVENT_DEFEAT, onEventTMP);
+    bus.subscribe<std::string>(EventHandler::EVENT_GUEST_ENTER_ROOM, onEventTMP);
+    bus.subscribe<std::string>(EventHandler::EVENT_GUEST_LEAVE_ROOM, onEventTMP);
+    bus.subscribe<std::string>(EventHandler::EVENT_CHAT, onEventTMP);
+    bus.subscribe<std::string>(EventHandler::EVENT_HEART_DISMISS, onEventTMP);
+    bus.subscribe<std::string>(EventHandler::EVENT_MOVE_TIMEOUT, onEventTMP);
+    bus.subscribe<std::string>(EventHandler::EVENT_OFFLINE_TIMEOUT, onEventTMP);
 }

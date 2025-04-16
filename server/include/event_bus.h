@@ -14,7 +14,6 @@ class EventBus {
 public:
     using EventHandler = std::function<void(const std::any&)>;
 
-    // 强类型订阅
     template<typename EventType>
     void subscribe(const std::string& event_type, std::function<void(const EventType&)> handler) {
         auto fun = [handler](const std::any& data) {

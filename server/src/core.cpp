@@ -94,7 +94,7 @@ void Core::do_enter_room(Message &msg, Request &request)
     try
     {
         std::string room_id = request.data["room_id"].get<std::string>();
-        Room room = g_rooms[room_id];
+        Room& room = g_rooms[room_id];
         std::string user_id = extract_user_id(request.token);
         Player *p = query_user(user_id);
         if (p)
@@ -106,6 +106,30 @@ void Core::do_enter_room(Message &msg, Request &request)
         {
             writeResponse(msg, Response{400, "enter_room failed", {}});
         }
+
+        m_state = IN_ROOM;
+    }
+    catch (const std::exception &e)
+    {
+        std::cerr << "其他错误: " << e.what() << std::endl;
+    }
+}
+
+void Core::do_exit_room(Message &msg, Request &request)
+{
+    try
+    {
+        std::string room_id = request.data["room_id"].get<std::string>();
+        Room room = g_rooms[room_id];
+        std::string user_id = extract_user_id(request.token);
+
+        std::vector<Player> list = room.players;
+        for (auto it=list.begin(); it != list.end(); it++) {
+            room.players.erase(it);
+        }
+
+        writeResponse(msg, Response{200, "exit_room success", {}});
+        m_state = FREE;
     }
     catch (const std::exception &e)
     {
@@ -119,7 +143,7 @@ void Core::do_get_room_info(Message &msg, Request &request)
     {
         std::string room_id = request.data["room_id"].get<std::string>();
         Room room = g_rooms[room_id];
-        writeResponse(msg, Response{200, "success", {room}});
+        writeResponse(msg, Response{200, "success", room});
     }
     catch (const std::exception &e)
     {
@@ -151,10 +175,13 @@ void Core::do_match_player(Message &msg, Request &request)
 
         // 2. 找到对手p后，创建room，把me和p加入到room
         int val = gen_random(0, 1);
-        if (val == 1) {
+        if (val == 1)
+        {
             self.color = "B";
             opponent->color = "W";
-        } else {
+        }
+        else
+        {
             self.color = "W";
             opponent->color = "B";
         }
@@ -162,13 +189,14 @@ void Core::do_match_player(Message &msg, Request &request)
         Room &room = create_room(m_user_id);
         room.players.push_back(self);
         room.players.push_back(*opponent);
+        room.board.move(0, 1, 'B');
         g_rooms[room.id] = room;
 
         // 4. 开启对弈模式，切换状态机等
         m_state = GAMING;
 
         // 5. 给两个人分别推送一条消息, 客户端之间跳转到room page开始下棋
-        ServerPusher& pusher = ServerPusher::getInstance();
+        ServerPusher &pusher = ServerPusher::getInstance();
         StartGameBody body;
         body.room = room;
         body.preTime = 5;
@@ -177,7 +205,8 @@ void Core::do_match_player(Message &msg, Request &request)
         pusher.server_push(msg.fd, PushMessage{"start_game", body});
 
         auto it = uidClientMap.find(opponent->id);
-        if (it != uidClientMap.end()) {
+        if (it != uidClientMap.end())
+        {
             pusher.server_push(it->second->fd, PushMessage{"start_game", body});
         }
 
@@ -301,7 +330,7 @@ int Core::run(Message &msg)
         else if (request.action == "enter_room")
         {
             do_enter_room(msg, request);
-        } 
+        }
         else if (request.action == "get_room_info")
         {
             do_get_room_info(msg, request);
@@ -338,14 +367,18 @@ int Core::run(Message &msg)
             return 0;
         }
 
-        if (request.action == "leave_room") {
-
+        if (request.action == "get_room_info")
+        {
+            do_get_room_info(msg, request);
         }
-
+        else if (request.action == "exit_room")
+        {
+            do_exit_room(msg, request);
+        }
     }
     else if (m_state == GAMING) // 下棋中
     {
-        gaming_run();
+        gaming_run(msg, request);
     }
     else if (m_state == FINISH)
     {
@@ -354,8 +387,13 @@ int Core::run(Message &msg)
 }
 
 // 客户端发的消息，落子/点目申请/认输
-int Core::gaming_run()
+int Core::gaming_run(Message &msg, Request& request)
 {
+    if (request.action == "get_room_info")
+    {
+        do_get_room_info(msg, request);
+    }
+
     if (m_game_state == WAITTING_BLACK_MOVE)
     {
         // 1. 通过room id获取room
@@ -363,7 +401,6 @@ int Core::gaming_run()
         // 3. 检查当前用户是否是执黑的player
         // 4. 检查围棋规则
         // 5. 推送落子到room内所有人
-
     }
     else if (m_game_state == WAITTING_WHITE_MOVE)
     {

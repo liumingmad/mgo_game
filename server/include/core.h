@@ -62,11 +62,12 @@ public:
     void do_get_room_list(Message &msg, Request &request);
     void do_create_room(Message &msg, Request &request);
     void do_enter_room(Message &msg, Request &request);
+    void do_exit_room(Message &msg, Request &request);
     void do_match_player(Message &msg, Request &request);
     void do_get_room_info(Message &msg, Request &request);
 
     // 对弈进行中的的状态机
-    int gaming_run();
+    int gaming_run(Message &msg, Request& Request);
 };
 
 #endif // CORE_H

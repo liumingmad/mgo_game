@@ -13,5 +13,5 @@ option(ENABLE_BOARD_TESTS "Enable tests for board" ON)
 
 if (ENABLE_BOARD_TESTS)
     add_executable(testboard test/TestBoard.cpp)
-    target_link_libraries(testboard PRIVATE board)
+    target_link_libraries(testboard PRIVATE board common)
 endif()

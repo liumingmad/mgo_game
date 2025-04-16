@@ -1,9 +1,37 @@
 #include <iostream>
+#include <string>
 #include "Board.h"
 #include "../include/utils.h"
 #include "Log.h"
 
 using namespace std;
+
+void to_json(nlohmann::json& j, const Board& b) {
+    j = nlohmann::json{
+        {"width", b.getWidth()},
+        {"height", b.getHeight()},
+        // {"data", },
+    };
+    Node& curr = b.getCurrentNode();
+    j["data"] = std::string(curr.data->getData());
+}
+
+// void from_json(const nlohmann::json& j, Board& b) {
+//     b.setWidth(j.at("width").get<int>());
+//     b.setHeight(j.at("height").get<int>());
+//     if (j.contains("root")) {
+//         auto root = new Node();
+//         j.at("root").get_to(*root);
+//         b.setRoot(root);
+//     }
+// }
+
+Node& Board::getRootNode() const {
+    return *root;
+}
+
+Board::Board() : Board(19, 19) {
+}
 
 Board::Board(int w, int h) {
     this->width = w;
@@ -15,11 +43,11 @@ Board::Board(int w, int h) {
 Board::~Board() {
 }
 
-int Board::getWidth() {
+int Board::getWidth() const {
     return this->width;
 }
 
-int Board::getHeight() {
+int Board::getHeight() const {
     return this->height;
 }
 
@@ -81,7 +109,7 @@ void Board::scanAndRemove(int player, BitArray2D& data, std::vector<Stone>& mark
     }
 }
 
-Node & Board::getCurrentNode()
+Node & Board::getCurrentNode() const
 {
     return *(this->current);
 }
