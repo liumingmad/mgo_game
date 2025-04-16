@@ -120,12 +120,14 @@ void Core::do_exit_room(Message &msg, Request &request)
     try
     {
         std::string room_id = request.data["room_id"].get<std::string>();
-        Room room = g_rooms[room_id];
         std::string user_id = extract_user_id(request.token);
 
-        std::vector<Player> list = room.players;
+        std::vector<Player>& list = g_rooms[room_id].players;
         for (auto it=list.begin(); it != list.end(); it++) {
-            room.players.erase(it);
+            if (it->id == user_id) {
+                list.erase(it);
+                break;
+            }
         }
 
         writeResponse(msg, Response{200, "exit_room success", {}});
@@ -221,7 +223,7 @@ void Core::do_match_player(Message &msg, Request &request)
 
 void Core::on_auth_success(int fd, std::string token)
 {
-    const Player *p;
+    Player p;
 
     std::string user_id = extract_user_id(token);
     const std::string key_user_id = KEY_USER_PREFIX + user_id;
@@ -233,26 +235,27 @@ void Core::on_auth_success(int fd, std::string token)
     {
         nlohmann::json j = nlohmann::json::parse(*player);
         const Player &tmp = j.get<Player>();
-        p = &tmp;
+        p = tmp;
     }
     else
     {
-        p = query_user(user_id);
-        if (p == NULL)
+        Player* tmp = query_user(user_id);
+        if (tmp == NULL)
         {
             std::cerr << "p == NULL" << std::endl;
             return;
         }
-        nlohmann::json j = *p;
+        p = *tmp;
+        nlohmann::json j = p;
         redis.set(key_user_id, j.dump());
     }
 
     m_user_id = user_id;
-    g_players.insert({p->id, *p});
+    g_players.insert({p.id, p});
 
     std::shared_ptr<Client> client = clientMap[fd];
-    client->user_id = p->id;
-    uidClientMap.insert({p->id, client});
+    client->user_id = p.id;
+    uidClientMap.insert({p.id, client});
 
     AsyncEventBus::getInstance().asyncPublish<std::string>(EventHandler::EVENT_ONLINE, user_id);
 }
