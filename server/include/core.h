@@ -38,8 +38,7 @@ private:
 
     enum GameState {
         PAUSE_OFFLINE,              // 计时器暂停, 对手掉线
-        WAITTING_BLACK_MOVE,        // 计时器开启, 等待黑棋落子  
-        WAITTING_WHITE_MOVE,        // 计时器开启, 等待白棋落子
+        WAITTING_MOVE,        // 计时器开启, 等待黑棋落子  
         COUNTING_POINTS,            // 计时器暂停, 等待对方确认, 计算棋盘点数
         GAME_OVER,                  // 计时器暂停, 游戏结束
     };
@@ -66,8 +65,7 @@ public:
     void do_match_player(Message &msg, Request &request);
     void do_get_room_info(Message &msg, Request &request);
 
-    // 对弈进行中的的状态机
-    int gaming_run(Message &msg, Request& Request);
+    void do_waitting_move(Message &msg, Request &request);
 };
 
 #endif // CORE_H

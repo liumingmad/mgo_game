@@ -212,8 +212,7 @@ void Core::do_match_player(Message &msg, Request &request)
             pusher.server_push(it->second->fd, PushMessage{"start_game", body});
         }
 
-        // 6. 推送后，客户端回复got it, 然后启动timer，切换到WAITTING_BLACK_MOVE
-        m_game_state = WAITTING_BLACK_MOVE;
+        m_game_state = WAITTING_MOVE;
     }
     catch (const std::exception &e)
     {
@@ -264,19 +263,12 @@ int Core::run(Message &msg)
 {
     Log::info("\n\n----------------------------");
 
-    // 1. json转成对象
     Request request;
     try
     {
         nlohmann::json j = nlohmann::json::parse(msg.text);
         request = j.get<Request>();
         std::cout << m_state << "解析成功: " << j.dump(2) << std::endl;
-
-        if (request.token.length() > 0)
-        {
-            std::string user_id = extract_user_id(request.token);
-            std::cout << "core::run() user_id: " << user_id << std::endl;
-        }
     }
     catch (const nlohmann::json::parse_error &e)
     {
@@ -288,130 +280,101 @@ int Core::run(Message &msg)
         std::cerr << "其他错误: " << e.what() << std::endl;
     }
 
-    if (m_state == UNAUTH)
+    std::string user_id;
+    if (request.token.length() == 0)
     {
-        // 断线重连进来, 暂时先默认进大厅
-        if (request.token.length() > 0)
+        if (request.action == "sign_in")
         {
-            if (!validate_jwt(request.token))
-            {
-                Log::error("Core::run() token is invalid");
-                writeResponse(msg, Response{401, "token is invalid", {}});
-                return 0;
-            }
-            on_auth_success(msg.fd, request.token);
-            m_state = FREE;
-        }
-        else
-        {
-            if (request.action == "sign_in")
-            {
-                do_sign_in(msg, request);
-                m_state = FREE;
-                return 0;
-            }
-        }
-    }
-
-    if (m_state == FREE)
-    {
-        if (!validate_jwt(request.token))
-        {
-            Log::error("Core::run() token is invalid");
+            do_sign_in(msg, request);
+        } else {
             writeResponse(msg, Response{401, "token is invalid", {}});
-            return 0;
         }
+        return 0;
+    } 
 
-        if (request.action == "get_room_list")
-        {
-            do_get_room_list(msg, request);
-        }
-        else if (request.action == "create_room")
-        {
-            do_create_room(msg, request);
-        }
-        else if (request.action == "enter_room")
-        {
-            do_enter_room(msg, request);
-        }
-        else if (request.action == "get_room_info")
-        {
-            do_get_room_info(msg, request);
-        }
-        else if (request.action == "match_player")
-        {
-            do_match_player(msg, request);
-        }
-        else if (request.action == "cancel_matching")
-        {
-        }
-        else if (request.action == "find_player")
-        {
-        }
-        else if (request.action == "get_player_info")
-        {
-        }
-        else if (request.action == "get_sgf")
-        {
-        }
-        else if (request.action == "get_sgf_list")
-        {
-        }
-        else if (request.action == "sign_out")
-        {
-        }
-    }
-    else if (m_state == IN_ROOM) // 观战状态
+    user_id = extract_user_id(request.token);
+    std::cout << "core::run() user_id: " << user_id << std::endl;
+    if (!validate_jwt(request.token))
     {
-        if (!validate_jwt(request.token))
-        {
-            Log::error("Core::run() token is invalid");
-            writeResponse(msg, Response{401, "token is invalid", {}});
-            return 0;
-        }
+        Log::error("Core::run() token is invalid");
+        writeResponse(msg, Response{401, "token is invalid", {}});
+        return 0;
+    }
+    on_auth_success(msg.fd, request.token);
 
-        if (request.action == "get_room_info")
-        {
-            do_get_room_info(msg, request);
-        }
-        else if (request.action == "exit_room")
-        {
-            do_exit_room(msg, request);
-        }
-    }
-    else if (m_state == GAMING) // 下棋中
+
+    if (request.action == "get_room_list")
     {
-        gaming_run(msg, request);
+        do_get_room_list(msg, request);
     }
-    else if (m_state == FINISH)
+    else if (request.action == "create_room")
     {
+        do_create_room(msg, request);
+    }
+    else if (request.action == "enter_room")
+    {
+        do_enter_room(msg, request);
+    }
+    else if (request.action == "get_room_info")
+    {
+        do_get_room_info(msg, request);
+    }
+    else if (request.action == "match_player")
+    {
+        do_match_player(msg, request);
+    }
+    else if (request.action == "cancel_matching")
+    {
+    }
+    else if (request.action == "find_player")
+    {
+    }
+    else if (request.action == "get_player_info")
+    {
+    }
+    else if (request.action == "get_sgf")
+    {
+    }
+    else if (request.action == "get_sgf_list")
+    {
+    }
+    else if (request.action == "sign_out")
+    {
+    }
+    else if (request.action == "get_room_info")
+    {
+        do_get_room_info(msg, request);
+    }
+    else if (request.action == "exit_room")
+    {
+        do_exit_room(msg, request);
+    }
+    else if (request.action == "get_room_info")
+    {
+        do_get_room_info(msg, request);
+    } 
+    else if (request.action == "move") 
+    {
+        do_waitting_move(msg, request);
     }
     return 0;
 }
 
-// 客户端发的消息，落子/点目申请/认输
-int Core::gaming_run(Message &msg, Request& request)
-{
-    if (request.action == "get_room_info")
-    {
-        do_get_room_info(msg, request);
-    }
+void Core::do_waitting_move(Message &msg, Request &request) {
+    // 1. 通过room id获取room
+    std::string room_id = request.data["room_id"].get<std::string>();
+    Room& room = g_rooms[room_id];
+    std::string user_id = extract_user_id(request.token);
 
-    if (m_game_state == WAITTING_BLACK_MOVE)
-    {
-        // 1. 通过room id获取room
-        // 2. 检查room状态，是否有人超时，或离线
-        // 3. 检查当前用户是否是执黑的player
-        // 4. 检查围棋规则
-        // 5. 推送落子到room内所有人
-    }
-    else if (m_game_state == WAITTING_WHITE_MOVE)
-    {
-    }
-    else if (m_game_state == COUNTING_POINTS)
-    {
-    }
-    else if (m_game_state == GAME_OVER)
-    {
-    }
+    // 2. 检查room状态，是否有人超时，或离线
+
+    // 3. 检查当前用户是否是执黑的player
+
+    // 4. 检查围棋规则
+
+    // 5. 推送落子到room内所有人
+
+    // 6. 回复客户端200
+    writeResponse(msg, Response{200, "move success", {}});
+    
 }
