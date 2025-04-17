@@ -7,6 +7,7 @@
 
 #include "json.hpp"
 #include "Board.h"
+// #include "room.h"
 
 struct Request
 {
@@ -40,25 +41,15 @@ struct Player
 };
 NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(Player, id, name, level, color)
 
-struct Room
-{
-    std::string id;
-    std::vector<Player> players;
-
-    // 使用二进制位表示
-    // 0: 等待黑棋落子
-    // 1: 等待白棋落子
-    // 2: 黑方离线暂停
-    // 3: 白方离线暂停
-    // 4: 双方全都离线暂停
-    // 5: 正在数子
-    // 6: 对局结束
-    int state;
-
-    Board board;
+// struct Room
+// {
+//     std::string id;
+//     std::vector<Player> players;
+//     int state;
+//     Board board;
     
-};
-NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(Room, id, players, state, board)
+// };
+// NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(Room, id, players, state, board)
 
 struct SignInResponse
 {

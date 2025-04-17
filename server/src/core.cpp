@@ -99,7 +99,7 @@ void Core::do_enter_room(Message &msg, Request &request)
         Player *p = query_user(user_id);
         if (p)
         {
-            room.players.push_back(*p);
+            room.players[p->id] = *p;
             writeResponse(msg, Response{200, "enter_room success", room});
         }
         else
@@ -121,15 +121,7 @@ void Core::do_exit_room(Message &msg, Request &request)
     {
         std::string room_id = request.data["room_id"].get<std::string>();
         std::string user_id = extract_user_id(request.token);
-
-        std::vector<Player>& list = g_rooms[room_id].players;
-        for (auto it=list.begin(); it != list.end(); it++) {
-            if (it->id == user_id) {
-                list.erase(it);
-                break;
-            }
-        }
-
+        g_rooms[room_id].players.erase(user_id);
         writeResponse(msg, Response{200, "exit_room success", {}});
         m_state = FREE;
     }
@@ -189,9 +181,8 @@ void Core::do_match_player(Message &msg, Request &request)
         }
 
         Room &room = create_room(m_user_id);
-        room.players.push_back(self);
-        room.players.push_back(*opponent);
-        room.board.move(0, 1, 'B');
+        room.players[self.id] = self;
+        room.players[opponent->id] = *opponent;
         g_rooms[room.id] = room;
 
         // 4. 开启对弈模式，切换状态机等
@@ -368,7 +359,7 @@ void Core::do_waitting_move(Message &msg, Request &request) {
 
     // 2. 检查room状态，是否有人超时，或离线
 
-    // 3. 检查当前用户是否是执黑的player
+    // 3. 检查是否轮到当前用户落子
 
     // 4. 检查围棋规则
 

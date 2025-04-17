@@ -7,6 +7,7 @@
 
 #include "json.hpp"
 #include "body.h"
+#include "room.h"
 
 struct PushMessage
 {
