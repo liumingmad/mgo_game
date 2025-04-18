@@ -16,6 +16,7 @@
 #include "redis_pool.h"
 #include "timer.h"
 #include "global.h"
+#include <TimerManager.h>
 
 std::map<std::string, Player> g_players;
 std::map<std::string, Room> g_rooms;
@@ -45,8 +46,6 @@ int Server::init() {
     m_event_handler.init();
 
     // 定时器
-    std::shared_ptr<GameTimerCallback> gameTimerCallback = std::make_shared<GameTimerCallback>();
-    m_timer.addListener(gameTimerCallback);
     m_timer.start();
 
     return 0;
@@ -78,18 +77,17 @@ int Server::run(int port)
 
     Listen(listenfd, 5);
 
-    int epfd = Epoll_create(1);
+    m_epfd = Epoll_create(1);
 
     // for socket listenfd
-    struct epoll_event ev;
-    ev.events = EPOLLIN;
-    ev.data.fd = listenfd;
-    Epoll_ctl(epfd, EPOLL_CTL_ADD, listenfd, &ev);
+    m_epoll_event.events = EPOLLIN;
+    m_epoll_event.data.fd = listenfd;
+    Epoll_ctl(m_epfd, EPOLL_CTL_ADD, listenfd, &m_epoll_event);
 
     struct  epoll_event evlist[MAX_CLIENT_SIZE];
     
     while (1) {
-        int count = Epoll_wait(epfd, evlist, MAX_CLIENT_SIZE, -1);
+        int count = Epoll_wait(m_epfd, evlist, MAX_CLIENT_SIZE, -1);
         for (int i=0; i<count; i++) {
             struct epoll_event *one = evlist + i;
             if (one->events & EPOLLIN) {
@@ -103,12 +101,12 @@ int Server::run(int port)
                     struct epoll_event ev;
                     ev.events = EPOLLIN;
                     ev.data.fd = clientfd;
-                    Epoll_ctl(epfd, EPOLL_CTL_ADD, clientfd, &ev);
+                    Epoll_ctl(m_epfd, EPOLL_CTL_ADD, clientfd, &ev);
                     add_client(clientfd, clientaddr);
 
                 } else {
                     if (handle_request(clientMap[fd]) == 0) {
-                        Epoll_ctl(epfd, EPOLL_CTL_DEL, fd, &ev);
+                        Epoll_ctl(m_epfd, EPOLL_CTL_DEL, fd, &m_epoll_event);
                         Close(fd);
                         remove_client(fd);
                         std::cout << "client exit fd=" << fd << std::endl; 
@@ -165,7 +163,9 @@ int Server::handle_request(std::shared_ptr<Client> client) {
         rb->pop(nullptr, len);
     }
 
-    m_pool.submit(handle_message, client);
+    m_pool.submit([this, client]() {
+        this->handle_message(client);
+    });
 
     // 清理无效数据
     parser.clear_invalid_data(rb);
@@ -173,14 +173,20 @@ int Server::handle_request(std::shared_ptr<Client> client) {
     return n;
 }
 
-void handle_message(std::shared_ptr<Client> client) {
+void Server::handle_message(std::shared_ptr<Client> client) {
     // 加锁的原因是，不想让多个线程同时处理一个连接的消息
     std::unique_lock<std::mutex> lock(client->mutex);
     SafeQueue<Message>& queue = client->queue;
     while (!queue.empty()) {
         Message msg;
         if (queue.dequeue(msg)) {
-            client->core->run(msg);
+            if (msg.header->command == ProtocolHeader::HEADER_COMMAND_HEART) {
+                TimerManager::instance().addTask(1, 5000, [this, msg](){
+                    this->heart_timeout(msg.fd);
+                });
+            } else {
+                client->core->run(msg);
+            }
         }
     }
 }
@@ -195,6 +201,13 @@ void printMap(std::map<int, std::shared_ptr<Client>> map) {
     }
 }
 
+void Server::heart_timeout(int fd) {
+    Epoll_ctl(m_epfd, EPOLL_CTL_DEL, fd, &m_epoll_event);
+    Close(fd);
+    this->remove_client(fd);
+    std::cout << "heart timeout" << std::endl;
+}
+
 int Server::add_client(int fd, struct sockaddr_in addr) {
     std::cout << "add client " << fd << std::endl;
 
@@ -204,6 +217,9 @@ int Server::add_client(int fd, struct sockaddr_in addr) {
     clientMap.insert({fd, client});
     // printMap(clientMap);
 
+    TimerManager::instance().addTask(1, 5000, [this, fd](){
+        heart_timeout(fd);
+    });
     return 0;
 }
 

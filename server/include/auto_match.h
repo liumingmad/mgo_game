@@ -27,7 +27,7 @@ class AutoPlayerMatcher
         std::lock_guard<std::mutex> lock(mtx);
         clean_invalid_player(self);
 
-        self.mills = getMilliseconds(); 
+        self.mills = get_now_milliseconds(); 
         queue.push_back(self);
     }
 
@@ -37,7 +37,7 @@ class AutoPlayerMatcher
         std::lock_guard<std::mutex> lock(mtx);
 
         Player p;
-        long mills = getMilliseconds();
+        long mills = get_now_milliseconds();
         long DURATION = AUTO_MATCH_DURATION * 1000;
 
         // 先筛选出同级别的，然后再匹配相邻级别
@@ -68,7 +68,7 @@ class AutoPlayerMatcher
     }
 
     int clean_invalid_player(Player& deletePlayer) {
-        long mills = getMilliseconds();
+        long mills = get_now_milliseconds();
         long DURATION = AUTO_MATCH_DURATION * 1000;
         for (auto it=queue.begin(); it!=queue.end(); ) {
             if ((*it).id == deletePlayer.id || mills > it->mills + DURATION) {

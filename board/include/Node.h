@@ -9,6 +9,8 @@
 class Node
 {
     private:
+        // 落子的时间戳
+        long timemillis;
         Stone* stone;
         Node* parent;
         std::vector<Node> children;
@@ -23,6 +25,7 @@ class Node
         std::vector<Node> getChildren();
         void addChild(Node* node);
         void removeChild(Node* node);
+        long getTimemillis();
 };
 
 

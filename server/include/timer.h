@@ -8,31 +8,16 @@
 #include <chrono>
 #include <memory>
 
-// 回调接口
-class TimerCallback
-{
-public:
-    virtual void onTrigger() = 0;
-    virtual ~TimerCallback() = default;
-};
+#include "TimerManager.h"
 
-class GameTimerCallback : public TimerCallback
-{
-public:
-    void onTrigger() override;
-};
-
-// Timer 类
 class Timer
 {
 private:
-    long m_drution;
     std::thread m_thread;
     std::atomic<bool> m_running{true};
-    std::vector<std::shared_ptr<TimerCallback>> m_listener_list;
 
 public:
-    Timer(const long durtion = 2000) : m_drution(durtion)
+    Timer()
     {
     }
 
@@ -45,24 +30,22 @@ public:
         }
     }
 
-    void addListener(std::shared_ptr<TimerCallback> listener)
-    {
-        m_listener_list.push_back(listener);
-    }
-
     void start()
     {
         m_thread = std::thread([this]()
         {
+            int epfd = epoll_create1(0);
+            TimerManager::instance().init(epfd);
+            epoll_event events[10];
             while (m_running) {
-                std::this_thread::sleep_for(std::chrono::milliseconds(m_drution));
-                for (const auto& callback : m_listener_list) {
-                    if (callback) {
-                        callback->onTrigger();
+                int n = epoll_wait(epfd, events, 10, -1);
+                for (int i = 0; i < n; ++i) {
+                    if (events[i].data.fd == TimerManager::instance().getTimerFd()) {
+                        TimerManager::instance().handleTimerEvent();
                     }
                 }
-                // std::cout << "定时器触发任务: " << std::time(nullptr) << std::endl;
-            } });
+            } 
+        });
     }
 
     void cancel()

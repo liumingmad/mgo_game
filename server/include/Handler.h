@@ -14,7 +14,4 @@ public:
     std::string text; 
 };
 
-class Client;
-void handle_message(std::shared_ptr<Client> client);
-
 #endif // HANDLE_H

@@ -45,10 +45,13 @@ public:
 
 class Server {
 private:
+    int m_epfd;
+    struct epoll_event m_epoll_event;
+
     ThreadPool m_pool;
 
     // 全局定时器，每2s触发一次，用于所有正在进行的对局，触发超时认负
-    Timer m_timer{2000};
+    Timer m_timer;
 
     EventHandler m_event_handler;
 
@@ -56,6 +59,8 @@ public:
     int init();
     int run(int port);
     int handle_request(std::shared_ptr<Client> client);
+    void handle_message(std::shared_ptr<Client> client);
+    void heart_timeout(int fd);
     
     int add_client(int fd, struct sockaddr_in addr);
     int remove_client(int fd);

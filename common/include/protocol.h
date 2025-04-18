@@ -43,6 +43,13 @@ MOGO + 1 + JSON + MOVE/HEART + 10 + 129
 class ProtocolHeader
 {
 public:
+    static const int HEADER_COMMAND_HEART = 0;
+    static const int HEADER_COMMAND_AUTH = 1;
+    static const int HEADER_COMMAND_MOVE = 2;
+    static const int HEADER_COMMAND_QUERY = 3;
+    static const int HEADER_COMMAND_BUSSNESS = 4;
+    static const int HEADER_COMMAND_SERVER_PUSH = 5;
+
     // MOGO
     char magic_number[4];
 
@@ -179,7 +186,7 @@ public:
         // QUERY:   3
         // COMMAND_BUSSNESS:   4
         // COMMAND_SERVER_PUSH 5
-        buf[6] = 0x05;
+        buf[6] = ProtocolHeader::HEADER_COMMAND_SERVER_PUSH;
 
         // Serial Number
         buf[7] = static_cast<uint8_t>((serial_number >> 8) & 0xFF);

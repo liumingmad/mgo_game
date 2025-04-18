@@ -16,6 +16,14 @@ public:
     int state;
     Board board;
 
+    int preTime; // 5*60 s
+    int moveTime; // 60 seconds
+    int readSecondCount; // 读秒次数
+
+    int remain_pretime;
+    int remain_movetime;
+    int remain_read_second_count;
+
     // 使用二进制位表示
     // 0: 等待黑棋落子
     // 1: 等待白棋落子

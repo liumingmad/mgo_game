@@ -192,9 +192,6 @@ void Core::do_match_player(Message &msg, Request &request)
         ServerPusher &pusher = ServerPusher::getInstance();
         StartGameBody body;
         body.room = room;
-        body.preTime = 5;
-        body.readSecondCount = 3;
-        body.moveTime = 60;
         pusher.server_push(msg.fd, PushMessage{"start_game", body});
 
         auto it = uidClientMap.find(opponent->id);

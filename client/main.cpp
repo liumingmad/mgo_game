@@ -48,11 +48,12 @@ void write_buffer(uint8_t* buf, int data_len)
     
 }
 
-void read_procotol(MgoClient client, RingBuffer* rb) {
+int read_procotol(MgoClient client, RingBuffer* rb) {
     char buf[4*1024] = { 0 };
     int n = client.socket_read(buf);
     if (n == 0) {
-        return;
+        std::cout << "server close connect" << std::endl;
+        return 0;
     }
 
     rb->push(buf, n);
@@ -74,6 +75,7 @@ void read_procotol(MgoClient client, RingBuffer* rb) {
         // 4. 删除处理过的数据
         rb->pop(nullptr, len);
     }
+    return 1;
 }
 
 void run_client()
@@ -94,7 +96,9 @@ void run_client()
         client.socket_write(message, data_len+13);
 
         // read
-        read_procotol(client, rb);
+        if (read_procotol(client, rb) == 0) {
+            break;
+        }
 
     }
     client.socket_close();

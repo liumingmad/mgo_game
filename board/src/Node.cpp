@@ -1,4 +1,5 @@
 #include "Node.h"
+#include "common_utils.h"
 
 using namespace std;
 
@@ -6,6 +7,7 @@ Node::Node(int x, int y, char player, int boardWidth, int boardHeight) {
     this->stone = new Stone(x, y, player);
     this->data = new BitArray2D(boardWidth, boardHeight);
     this->parent = NULL;
+    this->timemillis = get_now_milliseconds();
 }
 
 Node::~Node() {
