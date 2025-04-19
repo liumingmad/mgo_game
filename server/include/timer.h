@@ -17,6 +17,9 @@ private:
     std::atomic<bool> m_running{true};
 
 public:
+    static const int TIME_TASK_ID_HEARTBEAT = 1; 
+    static const int TIME_TASK_ID_WAITTING_MOVE = 2; 
+
     Timer()
     {
     }

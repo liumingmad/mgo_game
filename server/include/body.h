@@ -30,11 +30,15 @@ struct Player
     std::string id;
     std::string name;
     int level;
-    // 开始申请的时间戳
-    long mills;
     // B or W char code
     // X is guest
     std::string color = "X";
+
+    // 开始申请的时间戳
+    long mills;
+
+    // online
+    bool online;
 
     // 上线和离线的时间点列表
     std::queue<long> active_time_list;

@@ -182,8 +182,9 @@ void Server::handle_message(std::shared_ptr<Client> client) {
         Message msg;
         if (queue.dequeue(msg)) {
             if (msg.header->command == ProtocolHeader::HEADER_COMMAND_HEART) {
-                TimerManager::instance().addTask(1, 30000, [this, msg](){
-                    this->heart_timeout(msg.fd);
+                int fd = msg.fd;
+                TimerManager::instance().addTask(Timer::TIME_TASK_ID_HEARTBEAT, 30000, [this, fd](){
+                    this->heart_timeout(fd);
                 });
                 std::cout << msg.fd << ":" << msg.text << std::endl;
                 response_heartbeat(msg.fd);
@@ -220,9 +221,9 @@ int Server::add_client(int fd, struct sockaddr_in addr) {
     clientMap.insert({fd, client});
     // printMap(clientMap);
 
-    TimerManager::instance().addTask(1, 30000, [this, fd](){
-        heart_timeout(fd);
-    });
+    // TimerManager::instance().addTask(Timer::TIME_TASK_ID_HEARTBEAT, 30000, [this, fd](){
+    //     heart_timeout(fd);
+    // });
     return 0;
 }
 
@@ -240,6 +241,11 @@ int Server::remove_client(int fd) {
         const std::string key_user_id = KEY_USER_PREFIX + user_id;
         Redis &redis = RedisPool::getInstance().getRedis();
         redis.del(key_user_id);
+
+        // auto it = g_players.find(user_id);
+        // if (it != g_players.end()) {
+        //     it->second.online = false;
+        // }
     }
 
     clientMap.erase(fd);

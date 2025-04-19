@@ -94,8 +94,8 @@ void Board::scanAndRemove(int player, BitArray2D& data, std::vector<Stone>& mark
 
     // remove
     for (Stone one : markList) {
-        int x = one.getX();
-        int y = one.getY();
+        int x = one.x;
+        int y = one.y;
         data[x][y] = '0';
     }
 

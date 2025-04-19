@@ -1,20 +1,22 @@
 #ifndef STONE_H
 #define STONE_H
 
+#include "json.hpp"
+
 class Stone
 {
-    private:
+    public:
         int x;
         int y;
         // 'B' = black, 'W' = white
-        char player;
-    public:
+        char color;
+        Stone();
         Stone(int x, int y, char player);
         ~Stone();
-        int getX();
-        int getY();
-        char getPlayer();
 };
+
+void to_json(nlohmann::json& j, const Stone& s);
+void from_json(const nlohmann::json& j, Stone& s);
 
 
 #endif // STONE_H

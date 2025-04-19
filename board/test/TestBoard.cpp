@@ -23,7 +23,7 @@ void testHasLiberty() {
     print_board(tmp);
     std::cout << "hasLiberty=" << has << std::endl;
     for (Stone one : list) {
-        std::cout << one.getX() << "," << one.getY() << std::endl;
+        std::cout << one.x << "," << one.y << std::endl;
     }
 }
 
@@ -45,7 +45,7 @@ void testScanAndRemove() {
     std::vector<Stone> list;
     board->scanAndRemove('W', tmp, list);
     for (Stone one : list) {
-        std::cout << one.getX() << "," << one.getY() << std::endl;
+        std::cout << one.x << "," << one.y << std::endl;
     }
     print_board(tmp);
 }

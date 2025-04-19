@@ -31,9 +31,9 @@ void Node::setParent(Node* node) {
     } else {
         p = new BitArray2D(5, 5);
     }
-    int x = this->stone->getX(); 
-    int y = this->stone->getY();
-    (*p)[x][y] = this->stone->getPlayer();
+    int x = this->stone->x; 
+    int y = this->stone->y;
+    (*p)[x][y] = this->stone->color;
     this->data = p;
 
     // assign to parent
@@ -50,9 +50,9 @@ void Node::addChild(Node* node) {
 
 void Node::removeChild(Node* node) {
     for (int i = 0; i < this->children.size(); i++) {
-        if (this->children[i].getStone().getX() == node->getStone().getX() &&
-            this->children[i].getStone().getY() == node->getStone().getY() &&
-            this->children[i].getStone().getPlayer() == node->getStone().getPlayer()) {
+        if (this->children[i].getStone().x == node->getStone().x &&
+            this->children[i].getStone().y == node->getStone().y &&
+            this->children[i].getStone().color == node->getStone().color) {
             this->children.erase(this->children.begin() + i);
             return;
         }

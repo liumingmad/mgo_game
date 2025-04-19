@@ -36,9 +36,8 @@ public:
     static const int ROOM_STATE_WAITTING_WHITE_MOVE = 1 << 1;
     static const int ROOM_STATE_BLACK_OFFLINE = 1 << 2;
     static const int ROOM_STATE_WHITE_OFFLINE = 1 << 3;
-    static const int ROOM_STATE_BOTH_OFFLINE = 1 << 4;
-    static const int ROOM_STATE_POINT_COUNTTING = 1 << 5;
-    static const int ROOM_STATE_GAME_OVER = 1 << 6;
+    static const int ROOM_STATE_POINT_COUNTTING = 1 << 4;
+    static const int ROOM_STATE_GAME_OVER = 1 << 5;
 
     Room(){}
     ~Room(){}

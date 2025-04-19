@@ -13,6 +13,7 @@
 #include <redis_pool.h>
 #include <push_message.h>
 #include <server_push.h>
+#include "Stone.h"
 
 int writeResponse(Message &msg, Response response)
 {
@@ -183,6 +184,7 @@ void Core::do_match_player(Message &msg, Request &request)
         Room &room = create_room(m_user_id);
         room.players[self.id] = self;
         room.players[opponent->id] = *opponent;
+        room.state = Room::ROOM_STATE_WAITTING_BLACK_MOVE;
         g_rooms[room.id] = room;
 
         // 4. 开启对弈模式，切换状态机等
@@ -201,6 +203,19 @@ void Core::do_match_player(Message &msg, Request &request)
         }
 
         m_game_state = WAITTING_MOVE;
+
+        // 开定时器，等待30秒，第一步
+        int fd = msg.fd;
+        std::string room_id = room.id;
+        TimerManager::instance().addTask(Timer::TIME_TASK_ID_WAITTING_MOVE, 30000, [fd, room_id](){
+            std::cout << "invalid game" << std::endl; 
+            // 1. push message: invalid game
+            ServerPusher::getInstance().server_push(fd, PushMessage{"first_move_timeout", {}});
+
+            // 2. set room state
+            Room& room = g_rooms[room_id];
+            room.state = Room::ROOM_STATE_GAME_OVER;
+        });
     }
     catch (const std::exception &e)
     {
@@ -345,6 +360,9 @@ int Core::run(Message &msg)
     {
         do_waitting_move(msg, request);
     }
+    else if (request.action == "point_counting") 
+    {
+    }
     return 0;
 }
 
@@ -355,14 +373,62 @@ void Core::do_waitting_move(Message &msg, Request &request) {
     std::string user_id = extract_user_id(request.token);
 
     // 2. 检查room状态，是否有人超时，或离线
+    bool is_waitting_black = room.state & Room::ROOM_STATE_WAITTING_BLACK_MOVE;
+    bool is_waitting_white = room.state & Room::ROOM_STATE_WAITTING_WHITE_MOVE;
+    if (!is_waitting_black && !is_waitting_white) {
+        writeResponse(msg, Response{400, "move error, room state is "+room.state, {}});
+        return;
+    } 
 
     // 3. 检查是否轮到当前用户落子
+    bool should_move = false;
+    const Player& p = room.players[user_id]; 
+    bool self_is_black = p.color == "B";
+    if (self_is_black) {
+        should_move = is_waitting_black;
+    } else {
+        should_move = is_waitting_white;
+    }
+
+    if (!should_move) {
+        writeResponse(msg, Response{400, "move error, your should be not move", {}});
+        return;
+    }
 
     // 4. 检查围棋规则
+    Stone stone;
+    const nlohmann::json& j = request.data["stone"];
+    from_json(j, stone);
+    int success = room.board.move(stone.x, stone.y, stone.color);
+    if (!success) {
+        writeResponse(msg, Response{400, "move error, move()", {}});
+        return;
+    }
 
     // 5. 推送落子到room内所有人
+    std::map<std::string, Player>& map = room.players;
+    for (const auto& [key, value] : map) {
+        const int fd = uidClientMap[key]->fd;
+        if (fd == msg.fd) continue;
+        ServerPusher::getInstance().server_push(fd, PushMessage{"move", {
+            {"room_id", room_id},
+            {"stone", stone},
+        }});
+    }
 
     // 6. 回复客户端200
     writeResponse(msg, Response{200, "move success", {}});
     
+    // 7. 添加定时器，如果对手超时没落子，就判负
+    TimerManager::instance().addTask(Timer::TIME_TASK_ID_WAITTING_MOVE, 30000, [room_id](){
+        // push message for all
+        Room& room = g_rooms[room_id];
+        std::map<std::string, Player>& map = room.players;
+        for (const auto& [key, value] : map) {
+            const int fd = uidClientMap[key]->fd;
+            ServerPusher::getInstance().server_push(fd, PushMessage{"move_timeout", {
+                {"room_id", room_id},
+            }});
+        }
+    });
 }
