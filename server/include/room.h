@@ -13,7 +13,7 @@ class Room {
 public:
     std::string id;
     std::map<std::string, Player> players;
-    int state;
+    int state = ROOM_STATE_INIT;
     Board board;
 
     int preTime; // 5*60 s
@@ -32,6 +32,7 @@ public:
     // 4: 双方全都离线暂停
     // 5: 正在数子
     // 6: 对局结束
+    static const int ROOM_STATE_INIT = 0;
     static const int ROOM_STATE_WAITTING_BLACK_MOVE = 1;
     static const int ROOM_STATE_WAITTING_WHITE_MOVE = 1 << 1;
     static const int ROOM_STATE_BLACK_OFFLINE = 1 << 2;

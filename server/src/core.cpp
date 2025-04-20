@@ -75,6 +75,7 @@ Room &create_room(std::string user_id)
     auto now = std::chrono::system_clock::now();
     auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(now.time_since_epoch());
     room->id = user_id + "_" + std::to_string(duration.count());
+    room->state = Room::ROOM_STATE_INIT;
     return *room;
 }
 
@@ -169,7 +170,7 @@ void Core::do_match_player(Message &msg, Request &request)
         }
 
         // 2. 找到对手p后，创建room，把me和p加入到room
-        int val = gen_random(0, 1);
+        int val = 1;//gen_random(0, 1);
         if (val == 1)
         {
             self.color = "B";
@@ -205,17 +206,17 @@ void Core::do_match_player(Message &msg, Request &request)
         m_game_state = WAITTING_MOVE;
 
         // 开定时器，等待30秒，第一步
-        int fd = msg.fd;
-        std::string room_id = room.id;
-        TimerManager::instance().addTask(Timer::TIME_TASK_ID_WAITTING_MOVE, 30000, [fd, room_id](){
-            std::cout << "invalid game" << std::endl; 
-            // 1. push message: invalid game
-            ServerPusher::getInstance().server_push(fd, PushMessage{"first_move_timeout", {}});
+        // int fd = msg.fd;
+        // std::string room_id = room.id;
+        // TimerManager::instance().addTask(Timer::TIME_TASK_ID_WAITTING_MOVE, 30000, [fd, room_id](){
+        //     std::cout << "invalid game" << std::endl; 
+        //     // 1. push message: invalid game
+        //     ServerPusher::getInstance().server_push(fd, PushMessage{"first_move_timeout", {}});
 
-            // 2. set room state
-            Room& room = g_rooms[room_id];
-            room.state = Room::ROOM_STATE_GAME_OVER;
-        });
+        //     // 2. set room state
+        //     Room& room = g_rooms[room_id];
+        //     room.state = Room::ROOM_STATE_GAME_OVER;
+        // });
     }
     catch (const std::exception &e)
     {
@@ -382,8 +383,8 @@ void Core::do_waitting_move(Message &msg, Request &request) {
 
     // 3. 检查是否轮到当前用户落子
     bool should_move = false;
-    const Player& p = room.players[user_id]; 
-    bool self_is_black = p.color == "B";
+    const Player& self = room.players[user_id]; 
+    bool self_is_black = self.color == "B";
     if (self_is_black) {
         should_move = is_waitting_black;
     } else {
@@ -409,9 +410,9 @@ void Core::do_waitting_move(Message &msg, Request &request) {
     std::map<std::string, Player>& map = room.players;
     for (const auto& [key, value] : map) {
         const int fd = uidClientMap[key]->fd;
-        if (fd == msg.fd) continue;
         ServerPusher::getInstance().server_push(fd, PushMessage{"move", {
             {"room_id", room_id},
+            {"player_id", user_id},
             {"stone", stone},
         }});
     }
@@ -420,14 +421,24 @@ void Core::do_waitting_move(Message &msg, Request &request) {
     writeResponse(msg, Response{200, "move success", {}});
     
     // 7. 添加定时器，如果对手超时没落子，就判负
-    TimerManager::instance().addTask(Timer::TIME_TASK_ID_WAITTING_MOVE, 30000, [room_id](){
+    // 获取对手的id
+    std::string opponent_id;
+    for (const auto& [key, value] : room.players) {
+        if (value.color != "X" && value.id != user_id) {
+            opponent_id = value.id;
+        }
+    }
+    TimerManager::instance().addTask(Timer::TIME_TASK_ID_WAITTING_MOVE, 30000, [room_id, opponent_id](){
         // push message for all
         Room& room = g_rooms[room_id];
+        room.state = Room::ROOM_STATE_GAME_OVER;
+
         std::map<std::string, Player>& map = room.players;
         for (const auto& [key, value] : map) {
             const int fd = uidClientMap[key]->fd;
             ServerPusher::getInstance().server_push(fd, PushMessage{"move_timeout", {
                 {"room_id", room_id},
+                {"player_id", opponent_id},
             }});
         }
     });
