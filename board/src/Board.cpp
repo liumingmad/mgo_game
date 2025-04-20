@@ -6,14 +6,18 @@
 
 using namespace std;
 
+
 void to_json(nlohmann::json& j, const Board& b) {
     j = nlohmann::json{
         {"width", b.getWidth()},
         {"height", b.getHeight()},
-        // {"data", },
     };
-    Node& curr = b.getCurrentNode();
-    j["data"] = std::string(curr.data->getData());
+    std::shared_ptr<Node> curr = b.getCurrentNode();
+    j["data"] = std::string(curr->data->getData());
+
+    nlohmann::json tree;
+    to_json(tree, b.getRootNode());
+    j["tree"] = tree;
 }
 
 // void from_json(const nlohmann::json& j, Board& b) {
@@ -26,8 +30,8 @@ void to_json(nlohmann::json& j, const Board& b) {
 //     }
 // }
 
-Node& Board::getRootNode() const {
-    return *root;
+std::shared_ptr<Node> Board::getRootNode() const {
+    return root;
 }
 
 Board::Board() : Board(19, 19) {
@@ -36,7 +40,7 @@ Board::Board() : Board(19, 19) {
 Board::Board(int w, int h) {
     this->width = w;
     this->height = h;
-    this->root = new Node(-1, -1, 'T', w, h);
+    this->root = std::make_shared<Node>(-1, -1, 'T', w, h);
     this->current = this->root;
 }
 
@@ -52,7 +56,7 @@ int Board::getHeight() const {
 }
 
 int Board::get(int x, int y) {
-    return *(this->current->data)[x][y];
+    return (*(this->current->data))[x][y];
 }
 
 int Board::move(int x, int y, char player) {
@@ -63,7 +67,7 @@ int Board::move(int x, int y, char player) {
     }
 
     // add node to tree
-    Node* node = new Node(x, y, player, this->width, this->height);
+    std::shared_ptr<Node> node = std::make_shared<Node>(x, y, player, this->width, this->height);
     node->setParent(this->current);
     this->current->addChild(node);
     this->current = node;
@@ -109,9 +113,9 @@ void Board::scanAndRemove(int player, BitArray2D& data, std::vector<Stone>& mark
     }
 }
 
-Node & Board::getCurrentNode() const
+std::shared_ptr<Node> Board::getCurrentNode() const
 {
-    return *(this->current);
+    return this->current;
 }
 
 int Board::check(int x, int y, char player) {
@@ -149,7 +153,7 @@ int Board::isSuicide(int x, int y, char player, BitArray2D data) {
     // 3. 如果被提吃的子是1个，则有可能是打劫，不算自杀
     // 如果当前节点的孩子节点与当前节点的父节点相同，则认为盘面重复
     if (killedList.size() == 1) {
-        Node* pNode = this->current->getParent();
+        std::shared_ptr<Node> pNode = this->current->getParent();
         if (pNode == NULL) {
             log("isSuicide() parent is NULL");
             return 0;

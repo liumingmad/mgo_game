@@ -76,6 +76,9 @@ Room &create_room(std::string user_id)
     auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(now.time_since_epoch());
     room->id = user_id + "_" + std::to_string(duration.count());
     room->state = Room::ROOM_STATE_INIT;
+
+    room->board.move(2, 2, 'B');
+    room->board.move(2, 3, 'W');
     return *room;
 }
 
@@ -98,16 +101,16 @@ void Core::do_enter_room(Message &msg, Request &request)
         std::string room_id = request.data["room_id"].get<std::string>();
         Room& room = g_rooms[room_id];
         std::string user_id = extract_user_id(request.token);
-        Player *p = query_user(user_id);
-        if (p)
-        {
-            room.players[p->id] = *p;
-            writeResponse(msg, Response{200, "enter_room success", room});
-        }
-        else
-        {
+
+        auto it = g_players.find(user_id);
+        if (it == g_players.end()) {
             writeResponse(msg, Response{400, "enter_room failed", {}});
+            return;
         }
+
+        Player& p = it->second;
+        room.players[p.id] = p;
+        writeResponse(msg, Response{200, "enter_room success", room});
 
         m_state = IN_ROOM;
     }
@@ -138,7 +141,7 @@ void Core::do_get_room_info(Message &msg, Request &request)
     try
     {
         std::string room_id = request.data["room_id"].get<std::string>();
-        Room room = g_rooms[room_id];
+        Room& room = g_rooms[room_id];
         writeResponse(msg, Response{200, "success", room});
     }
     catch (const std::exception &e)

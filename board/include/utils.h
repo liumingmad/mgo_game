@@ -1,11 +1,12 @@
 #ifndef UTILS_H
 #define UTILS_H
 
+#include <memory>
 #include "BitArray2D.h"
 
 void print_board(const BitArray2D& board);
 
-void print_board_p(BitArray2D* board);
+void print_board_p(std::shared_ptr<BitArray2D> board);
 
 void log(std::string msg);
 

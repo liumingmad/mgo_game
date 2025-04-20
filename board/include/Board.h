@@ -11,8 +11,8 @@ class Board
 private:
     int width;
     int height;
-    Node* root;
-    Node* current;
+    std::shared_ptr<Node> root;
+    std::shared_ptr<Node> current;
 
 public:
     int check(int x, int y, char player);
@@ -29,8 +29,8 @@ public:
     int get(int x, int y);
     int move(int x, int y, char player);
     int score(char player);
-    Node& getCurrentNode() const;
-    Node& getRootNode() const;
+    std::shared_ptr<Node> getCurrentNode() const;
+    std::shared_ptr<Node> getRootNode() const;
 };
 
 

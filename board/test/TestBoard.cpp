@@ -98,27 +98,27 @@ void testMove() {
     board->move(0, 0, 'W');
     board->move(0, 1, 'W');
     board->move(1, 1, 'W');
-    print_board_p(board->getCurrentNode().data);
+    print_board_p(board->getCurrentNode()->data);
 
     // 提掉一个子
     board->move(2, 0, 'W');
-    print_board_p(board->getCurrentNode().data);
+    print_board_p(board->getCurrentNode()->data);
 
     // suicide
     board->move(1, 0, 'B');
-    print_board_p(board->getCurrentNode().data);
+    print_board_p(board->getCurrentNode()->data);
     
     // 找劫财
     board->move(4, 0, 'B');
-    print_board_p(board->getCurrentNode().data);
+    print_board_p(board->getCurrentNode()->data);
 
     // 应劫财
     board->move(4, 1, 'W');
-    print_board_p(board->getCurrentNode().data);
+    print_board_p(board->getCurrentNode()->data);
 
     // 再提劫
     board->move(1, 0, 'B');
-    print_board_p(board->getCurrentNode().data);
+    print_board_p(board->getCurrentNode()->data);
 }
 
 int main(int argc, char const *argv[])

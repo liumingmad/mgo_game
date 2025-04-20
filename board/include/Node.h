@@ -11,22 +11,23 @@ class Node
     private:
         // 落子的时间戳
         long timemillis;
-        Stone* stone;
-        Node* parent;
-        std::vector<Node> children;
+        std::shared_ptr<Stone> stone;
+        std::shared_ptr<Node> parent;
+        std::vector<std::shared_ptr<Node>> children;
 
     public:
-        BitArray2D* data;
+        std::shared_ptr<BitArray2D> data;
         Node(int x, int y, char player, int w, int h);
         ~Node();
-        Stone& getStone();
-        Node* getParent();
-        void setParent(Node* node);
-        std::vector<Node> getChildren();
-        void addChild(Node* node);
-        void removeChild(Node* node);
+        Stone& getStone() const;
+        std::shared_ptr<Node> getParent();
+        void setParent(std::shared_ptr<Node> node);
+        std::vector<std::shared_ptr<Node>> getChildren() const;
+        void addChild(std::shared_ptr<Node> node);
+        void removeChild(std::shared_ptr<Node> node);
         long getTimemillis();
 };
-
+void to_json(nlohmann::json& j, std::shared_ptr<Node> node);
+// void from_json(const nlohmann::json& j, Board& b);
 
 #endif // NODE_H

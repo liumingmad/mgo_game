@@ -7,6 +7,7 @@
 #include "body.h"
 #include "json.hpp"
 #include "Board.h"
+#include "Node.h"
 
 
 class Room {

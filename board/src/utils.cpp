@@ -3,6 +3,7 @@
 
 #include <iostream>
 #include "BitArray2D.h"
+#include <memory>
 void print_board(const BitArray2D& board)
 {
     int rows = board.getRows();
@@ -16,7 +17,7 @@ void print_board(const BitArray2D& board)
     std::cout << "------------------------" << std::endl;
 }
 
-void print_board_p(BitArray2D* board) {
+void print_board_p(std::shared_ptr<BitArray2D> board) {
     print_board(*board);
 }
 
