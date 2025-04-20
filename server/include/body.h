@@ -67,4 +67,15 @@ struct MatchPlayerResponse
     int waiting_seconds;
 };
 NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(MatchPlayerResponse, waiting_seconds)
+
+struct MatchPlayerRequest
+{
+    int level;
+    int preTime;
+    int readSecondCount;
+    int moveTime;
+};
+NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(MatchPlayerRequest, level, preTime, readSecondCount, moveTime)
+
 #endif // BODY_H
+

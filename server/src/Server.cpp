@@ -47,7 +47,7 @@ int Server::init() {
     m_event_handler.init();
 
     // 定时器
-    m_timer.start();
+    // m_timer.start();
 
     return 0;
 }

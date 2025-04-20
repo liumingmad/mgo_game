@@ -186,6 +186,14 @@ void Core::do_match_player(Message &msg, Request &request)
         room.players[self.id] = self;
         room.players[opponent->id] = *opponent;
         room.state = Room::ROOM_STATE_WAITTING_BLACK_MOVE;
+
+        MatchPlayerRequest req;
+        const nlohmann::json& j = request.data;
+        from_json(j, req);
+        room.preTime = req.preTime;
+        room.readSecondCount = req.readSecondCount;
+        room.moveTime = req.moveTime;
+
         g_rooms[room.id] = room;
 
         // 4. 开启对弈模式，切换状态机等
@@ -206,17 +214,26 @@ void Core::do_match_player(Message &msg, Request &request)
         m_game_state = WAITTING_MOVE;
 
         // 开定时器，等待30秒，第一步
-        // int fd = msg.fd;
-        // std::string room_id = room.id;
-        // TimerManager::instance().addTask(Timer::TIME_TASK_ID_WAITTING_MOVE, 30000, [fd, room_id](){
-        //     std::cout << "invalid game" << std::endl; 
-        //     // 1. push message: invalid game
-        //     ServerPusher::getInstance().server_push(fd, PushMessage{"first_move_timeout", {}});
+        int fd = msg.fd;
+        std::string room_id = room.id;
+        std::string player_id;
+        if (self.color == "B") {
+            player_id = self.id;
+        } else {
+            player_id = opponent->id;
+        }
+        TimerManager::instance().addTask(Timer::TIME_TASK_ID_WAITTING_MOVE, 30000, [fd, room_id, player_id](){
+            std::cout << "invalid game" << std::endl; 
+            // 1. push message: invalid game
+            ServerPusher::getInstance().server_push(fd, PushMessage{"move_timeout", {
+                {"room_id", room_id},
+                {"player_id", player_id},
+            }});
 
-        //     // 2. set room state
-        //     Room& room = g_rooms[room_id];
-        //     room.state = Room::ROOM_STATE_GAME_OVER;
-        // });
+            // 2. set room state
+            Room& room = g_rooms[room_id];
+            room.state = Room::ROOM_STATE_GAME_OVER;
+        });
     }
     catch (const std::exception &e)
     {
@@ -406,6 +423,9 @@ void Core::do_waitting_move(Message &msg, Request &request) {
         return;
     }
 
+    // 6. 回复客户端200
+    writeResponse(msg, Response{200, "move success", {}});
+
     // 5. 推送落子到room内所有人
     std::map<std::string, Player>& map = room.players;
     for (const auto& [key, value] : map) {
@@ -416,9 +436,6 @@ void Core::do_waitting_move(Message &msg, Request &request) {
             {"stone", stone},
         }});
     }
-
-    // 6. 回复客户端200
-    writeResponse(msg, Response{200, "move success", {}});
     
     // 7. 添加定时器，如果对手超时没落子，就判负
     // 获取对手的id
