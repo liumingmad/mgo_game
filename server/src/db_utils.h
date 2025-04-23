@@ -8,8 +8,8 @@
 #include <cppconn/resultset.h>
 #include "db_connection_pool.h"
 #include "global.h"
-Player* query_user(std::string id) {
-    Player* player = new Player();
+std::shared_ptr<Player> query_user(std::string id) {
+    std::shared_ptr<Player> player = std::make_shared<Player>();
     try
     {
         auto conn = DBConnectionPool::getInstance()->getConnection();

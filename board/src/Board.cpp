@@ -170,9 +170,9 @@ int Board::isSuicide(int x, int y, char player, BitArray2D data) {
 
 // 当这个位置落子后，是否有气
 int Board::hasLiberty(int x, int y, char player, BitArray2D& tmp, std::vector<Stone>& markList) {
-    if (tmp[x][y] == 'X') return 0;
     if (x < 0 || x >= this->width) return 0;
     if (y < 0 || y >= this->height) return 0;
+    if (tmp[x][y] == 'X') return 0;
     if (tmp[x][y] == '0') return 1;
     if (tmp[x][y] == get_opponent(player)) return 0;
 

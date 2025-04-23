@@ -13,7 +13,7 @@
 class Room {
 public:
     std::string id;
-    std::map<std::string, Player> players;
+    std::map<std::string, std::shared_ptr<Player>> players;
     int state = ROOM_STATE_INIT;
     Board board;
 

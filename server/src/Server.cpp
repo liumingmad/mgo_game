@@ -19,8 +19,8 @@
 #include <TimerManager.h>
 #include <heartbeat.h>
 
-std::map<std::string, Player> g_players;
-std::map<std::string, Room> g_rooms;
+std::map<std::string, std::shared_ptr<Player>> g_players;
+std::map<std::string, std::shared_ptr<Room>> g_rooms;
 std::map<int, std::shared_ptr<Client>> clientMap;
 std::map<std::string, std::shared_ptr<Client>> uidClientMap;
 

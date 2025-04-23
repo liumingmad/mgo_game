@@ -166,24 +166,23 @@ public:
 class ProtocolWriter
 {
 public:
-    uint8_t* wrap_heartbeat_header_buffer(u_int16_t serial_number, std::string data)
+    void wrap_heartbeat_header_buffer(uint8_t* buf, u_int16_t serial_number, std::string data)
     {
-        return wrap_header_buffer(ProtocolHeader::HEADER_COMMAND_HEART, serial_number, data);
+        wrap_header_buffer(buf, ProtocolHeader::HEADER_COMMAND_HEART, serial_number, data);
     }
 
-    uint8_t* wrap_push_header_buffer(u_int16_t serial_number, std::string data)
+    void wrap_push_header_buffer(uint8_t* buf, u_int16_t serial_number, std::string data)
     {
-        return wrap_header_buffer(ProtocolHeader::HEADER_COMMAND_SERVER_PUSH, serial_number, data);
+        wrap_header_buffer(buf, ProtocolHeader::HEADER_COMMAND_SERVER_PUSH, serial_number, data);
     }
 
-    uint8_t* wrap_response_header_buffer(u_int16_t serial_number, std::string data)
+    void wrap_response_header_buffer(uint8_t* buf, u_int16_t serial_number, std::string data)
     {
-        return wrap_header_buffer(ProtocolHeader::HEADER_COMMAND_BUSSNESS, serial_number, data);
+        wrap_header_buffer(buf, ProtocolHeader::HEADER_COMMAND_BUSSNESS, serial_number, data);
     }
 
-    uint8_t* wrap_header_buffer(u_int8_t command, u_int16_t serial_number, std::string data)
+    void wrap_header_buffer(uint8_t* buf, u_int8_t command, u_int16_t serial_number, std::string data)
     {
-        uint8_t* buf = new uint8_t[HEADER_SIZE + data.length()]();
         // MOGO
         buf[0] = 'M';
         buf[1] = 'O';
@@ -214,8 +213,6 @@ public:
         intToBytes(number, &buf[9]);
 
         memcpy(buf+HEADER_SIZE, data.c_str(), data.length());
-
-        return buf;
     }
 
     void intToBytes(uint32_t value, uint8_t bytes[4])

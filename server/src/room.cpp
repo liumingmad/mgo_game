@@ -10,7 +10,7 @@ void to_json(nlohmann::json& j, const Room& r) {
     };
     std::vector<Player> list;
     for (const auto& [key, value] : r.players) {
-        list.push_back(value);
+        list.push_back(*value);
     }
     j["players"] = list; 
 

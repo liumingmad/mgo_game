@@ -9,7 +9,7 @@
 class AutoPlayerMatcher
 {
     private: 
-    std::deque<Player> queue;
+    std::deque<std::shared_ptr<Player>> queue;
     std::mutex mtx;
     AutoPlayerMatcher() {}
     ~AutoPlayerMatcher() {}
@@ -23,55 +23,56 @@ class AutoPlayerMatcher
     AutoPlayerMatcher(const AutoPlayerMatcher&) = delete;
     AutoPlayerMatcher& operator=(const AutoPlayerMatcher&) = delete;
 
-    void enqueue_waitting(Player& self) {
+    void enqueue_waitting(std::shared_ptr<Player> self) {
         std::lock_guard<std::mutex> lock(mtx);
-        clean_invalid_player(self);
+        clean_invalid_player(*self);
 
-        self.mills = get_now_milliseconds(); 
+        self->mills = get_now_milliseconds(); 
         queue.push_back(self);
     }
 
     // 传入发起人，返回对手, 如果没匹配到，就把p入队
-    std::optional<Player> auto_match(Player& self)
+    std::shared_ptr<Player> auto_match(const Player& self)
     {
         std::lock_guard<std::mutex> lock(mtx);
 
-        Player p;
+        std::shared_ptr<Player> p;
         long mills = get_now_milliseconds();
         long DURATION = AUTO_MATCH_DURATION * 1000;
 
         // 先筛选出同级别的，然后再匹配相邻级别
         for (auto it=queue.begin(); it!=queue.end(); it++) {
-            if (mills > it->mills + DURATION) continue;
-            if (it->level != self.level) continue;
-            if (it->id == self.id) continue; 
-            p = *it;
+            std::shared_ptr<Player> one = *it;
+            if (mills > one->mills + DURATION) continue;
+            if (one->level != self.level) continue;
+            if (one->id == self.id) continue; 
+            p = one;
             break;
         }
 
-        if (p.id.empty()) {
+        if (!p) {
             for (auto it=queue.begin(); it!=queue.end(); it++) {
-                if (mills > it->mills + DURATION) continue;
-                if (it->level == self.level + 1 || it->level == self.level - 1) {
-                    p = *it;
+                std::shared_ptr<Player> one = *it;
+                if (mills > one->mills + DURATION) continue;
+                if (one->level == self.level + 1 || one->level == self.level - 1) {
+                    p = one;
                     break;
                 } 
             }
         }
 
-        if (p.id.empty()) {
-            return std::nullopt;
+        if (p) {
+            clean_invalid_player(*p);
         }
-
-        clean_invalid_player(p);
         return p;
     }
 
-    int clean_invalid_player(Player& deletePlayer) {
+    int clean_invalid_player(const Player& deletePlayer) {
         long mills = get_now_milliseconds();
         long DURATION = AUTO_MATCH_DURATION * 1000;
         for (auto it=queue.begin(); it!=queue.end(); ) {
-            if ((*it).id == deletePlayer.id || mills > it->mills + DURATION) {
+            std::shared_ptr<Player> one = *it;
+            if (one->id == deletePlayer.id || mills > one->mills + DURATION) {
                 queue.erase(it);
             } else {
                 it++;

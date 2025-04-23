@@ -12,6 +12,7 @@ int ServerPusher::server_push(int fd, PushMessage message)
     std::string json = j.dump();
 
     ProtocolWriter pw;
-    u_int8_t *buf = pw.wrap_push_header_buffer(get_push_serial_number(), json);
+    uint8_t buf[HEADER_SIZE + json.length()];
+    pw.wrap_push_header_buffer(buf, get_push_serial_number(), json);
     Write(fd, buf, HEADER_SIZE + json.length());
 }

@@ -21,7 +21,8 @@ int writeResponse(Message &msg, Response response)
     std::string json = j.dump();
 
     ProtocolWriter pw;
-    u_int8_t *buf = pw.wrap_response_header_buffer(msg.header->serial_number, json);
+    uint8_t buf[HEADER_SIZE + json.length()];
+    pw.wrap_response_header_buffer(buf, msg.header->serial_number, json);
     Write(msg.fd, buf, HEADER_SIZE + json.length());
     return 0;
 }
@@ -62,32 +63,32 @@ void Core::do_get_room_list(Message &msg, Request &request)
     std::vector<Room> rooms;
     for (const auto &pair : g_rooms)
     {
-        rooms.push_back(pair.second);
+        rooms.push_back(*pair.second.get());
     }
     resp.data = rooms;
 
     writeResponse(msg, resp);
 }
 
-Room &create_room(std::string user_id)
+std::shared_ptr<Room> create_room(std::string user_id)
 {
-    Room *room = new Room();
+    std::shared_ptr<Room> room = std::make_shared<Room>();
     auto now = std::chrono::system_clock::now();
     auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(now.time_since_epoch());
     room->id = user_id + "_" + std::to_string(duration.count());
     room->state = Room::ROOM_STATE_INIT;
-    return *room;
+    return room;
 }
 
 void Core::do_create_room(Message &msg, Request &request)
 {
-    Room &room = create_room(m_user_id);
-    g_rooms[room.id] = room;
+    std::shared_ptr<Room> room = create_room(m_user_id);
+    g_rooms[room->id] = room;
 
     Response resp;
     resp.code = 200;
     resp.message = "create_room success";
-    resp.data = room;
+    resp.data = *(room.get());
     writeResponse(msg, resp);
 }
 
@@ -96,7 +97,7 @@ void Core::do_enter_room(Message &msg, Request &request)
     try
     {
         std::string room_id = request.data["room_id"].get<std::string>();
-        Room& room = g_rooms[room_id];
+        std::shared_ptr<Room> room = g_rooms[room_id];
         std::string user_id = extract_user_id(request.token);
 
         auto it = g_players.find(user_id);
@@ -105,9 +106,9 @@ void Core::do_enter_room(Message &msg, Request &request)
             return;
         }
 
-        Player& p = it->second;
-        room.players[p.id] = p;
-        writeResponse(msg, Response{200, "enter_room success", room});
+        std::shared_ptr<Player> p = it->second;
+        room->players[p->id] = p;
+        writeResponse(msg, Response{200, "enter_room success", *room.get()});
 
         m_state = IN_ROOM;
     }
@@ -123,7 +124,7 @@ void Core::do_exit_room(Message &msg, Request &request)
     {
         std::string room_id = request.data["room_id"].get<std::string>();
         std::string user_id = extract_user_id(request.token);
-        g_rooms[room_id].players.erase(user_id);
+        g_rooms[room_id]->players.erase(user_id);
         writeResponse(msg, Response{200, "exit_room success", {}});
         m_state = FREE;
     }
@@ -138,8 +139,8 @@ void Core::do_get_room_info(Message &msg, Request &request)
     try
     {
         std::string room_id = request.data["room_id"].get<std::string>();
-        Room& room = g_rooms[room_id];
-        writeResponse(msg, Response{200, "success", room});
+        std::shared_ptr<Room> room = g_rooms[room_id];
+        writeResponse(msg, Response{200, "success", *room.get()});
     }
     catch (const std::exception &e)
     {
@@ -158,12 +159,12 @@ void Core::do_match_player(Message &msg, Request &request)
         writeResponse(msg, Response{200, "success, please waitting 30s", MatchPlayerResponse{AUTO_MATCH_DURATION}});
 
         // 0. 从缓存中找自己的Player
-        Player &self = g_players[m_user_id];
+        std::shared_ptr<Player> self = g_players[m_user_id];
 
         // 1. 找到对手, 从自动匹配队列中找
         AutoPlayerMatcher &matcher = AutoPlayerMatcher::getInstance();
-        std::optional<Player> opponent = matcher.auto_match(self);
-        if (!opponent.has_value())
+        std::shared_ptr<Player> opponent = matcher.auto_match(*self);
+        if (!opponent)
         {
             matcher.enqueue_waitting(self);
             return;
@@ -173,28 +174,28 @@ void Core::do_match_player(Message &msg, Request &request)
         int val = gen_random(0, 1);
         if (val == 1)
         {
-            self.color = "B";
+            self->color = "B";
             opponent->color = "W";
         }
         else
         {
-            self.color = "W";
+            self->color = "W";
             opponent->color = "B";
         }
 
-        Room &room = create_room(m_user_id);
-        room.players[self.id] = self;
-        room.players[opponent->id] = *opponent;
-        room.state = Room::ROOM_STATE_WAITTING_BLACK_MOVE;
+        std::shared_ptr<Room> room = create_room(m_user_id);
+        room->players[self->id] = self;
+        room->players[opponent->id] = opponent;
+        room->state = Room::ROOM_STATE_WAITTING_BLACK_MOVE;
 
         MatchPlayerRequest req;
         const nlohmann::json& j = request.data;
         from_json(j, req);
-        room.preTime = req.preTime;
-        room.readSecondCount = req.readSecondCount;
-        room.moveTime = req.moveTime;
+        room->preTime = req.preTime;
+        room->readSecondCount = req.readSecondCount;
+        room->moveTime = req.moveTime;
 
-        g_rooms[room.id] = room;
+        g_rooms[room->id] = room;
 
         // 4. 开启对弈模式，切换状态机等
         m_state = GAMING;
@@ -202,7 +203,7 @@ void Core::do_match_player(Message &msg, Request &request)
         // 5. 给两个人分别推送一条消息, 客户端之间跳转到room page开始下棋
         ServerPusher &pusher = ServerPusher::getInstance();
         StartGameBody body;
-        body.room = room;
+        body.room = *room;
         pusher.server_push(msg.fd, PushMessage{"start_game", body});
 
         auto it = uidClientMap.find(opponent->id);
@@ -215,10 +216,10 @@ void Core::do_match_player(Message &msg, Request &request)
 
         // 开定时器，等待30秒，第一步
         int fd = msg.fd;
-        std::string room_id = room.id;
+        std::string room_id = room->id;
         std::string player_id;
-        if (self.color == "B") {
-            player_id = self.id;
+        if (self->color == "B") {
+            player_id = self->id;
         } else {
             player_id = opponent->id;
         }
@@ -231,8 +232,8 @@ void Core::do_match_player(Message &msg, Request &request)
             }});
 
             // 2. set room state
-            Room& room = g_rooms[room_id];
-            room.state = Room::ROOM_STATE_GAME_OVER;
+            std::shared_ptr<Room> room = g_rooms[room_id];
+            room->state = Room::ROOM_STATE_GAME_OVER;
         });
     }
     catch (const std::exception &e)
@@ -243,7 +244,7 @@ void Core::do_match_player(Message &msg, Request &request)
 
 void Core::on_auth_success(int fd, std::string token)
 {
-    Player p;
+    std::shared_ptr<Player> p;
 
     std::string user_id = extract_user_id(token);
     const std::string key_user_id = KEY_USER_PREFIX + user_id;
@@ -254,28 +255,27 @@ void Core::on_auth_success(int fd, std::string token)
     if (player.has_value())
     {
         nlohmann::json j = nlohmann::json::parse(*player);
-        const Player &tmp = j.get<Player>();
-        p = tmp;
+        p = std::make_shared<Player>(j.get<Player>());
     }
     else
     {
-        Player* tmp = query_user(user_id);
+        std::shared_ptr<Player> tmp = query_user(user_id);
         if (tmp == NULL)
         {
             std::cerr << "p == NULL" << std::endl;
             return;
         }
-        p = *tmp;
-        nlohmann::json j = p;
+        p = tmp;
+        nlohmann::json j = *p;
         redis.set(key_user_id, j.dump());
     }
 
     m_user_id = user_id;
-    g_players.insert({p.id, p});
+    g_players.insert({p->id, p});
 
     std::shared_ptr<Client> client = clientMap[fd];
-    client->user_id = p.id;
-    uidClientMap.insert({p.id, client});
+    client->user_id = p->id;
+    uidClientMap.insert({p->id, client});
 
     AsyncEventBus::getInstance().asyncPublish<std::string>(EventHandler::EVENT_ONLINE, user_id);
 }
@@ -387,21 +387,21 @@ int Core::run(Message &msg)
 void Core::do_waitting_move(Message &msg, Request &request) {
     // 1. 通过room id获取room
     std::string room_id = request.data["room_id"].get<std::string>();
-    Room& room = g_rooms[room_id];
+    std::shared_ptr<Room> room = g_rooms[room_id];
     std::string user_id = extract_user_id(request.token);
 
     // 2. 检查room状态，是否有人超时，或离线
-    bool is_waitting_black = room.state & Room::ROOM_STATE_WAITTING_BLACK_MOVE;
-    bool is_waitting_white = room.state & Room::ROOM_STATE_WAITTING_WHITE_MOVE;
+    bool is_waitting_black = room->state & Room::ROOM_STATE_WAITTING_BLACK_MOVE;
+    bool is_waitting_white = room->state & Room::ROOM_STATE_WAITTING_WHITE_MOVE;
     if (!is_waitting_black && !is_waitting_white) {
-        writeResponse(msg, Response{400, "move error, room state is "+room.state, {}});
+        writeResponse(msg, Response{400, "move error, room state is "+room->state, {}});
         return;
     } 
 
     // 3. 检查是否轮到当前用户落子
     bool should_move = false;
-    const Player& self = room.players[user_id]; 
-    bool self_is_black = (self.color == "B");
+    std::shared_ptr<Player> self = room->players[user_id]; 
+    bool self_is_black = (self->color == "B");
     if (self_is_black) {
         should_move = is_waitting_black;
     } else {
@@ -417,46 +417,47 @@ void Core::do_waitting_move(Message &msg, Request &request) {
     Stone stone;
     const nlohmann::json& j = request.data["stone"];
     from_json(j, stone);
-    int success = room.board.move(stone.x, stone.y, stone.color);
+    int success = room->board.move(stone.x, stone.y, stone.color);
     if (!success) {
         writeResponse(msg, Response{400, "move error, move()", {}});
         return;
     }
 
     if (is_waitting_black) {
-        room.state = Room::ROOM_STATE_WAITTING_WHITE_MOVE;
+        room->state = Room::ROOM_STATE_WAITTING_WHITE_MOVE;
     } else {
-        room.state = Room::ROOM_STATE_WAITTING_BLACK_MOVE;
+        room->state = Room::ROOM_STATE_WAITTING_BLACK_MOVE;
     }
 
     // 6. 回复客户端200
     writeResponse(msg, Response{200, "move success", {}});
 
     // 5. 推送落子到room内所有人
-    std::map<std::string, Player>& map = room.players;
+    std::map<std::string, std::shared_ptr<Player>>& map = room->players;
     for (const auto& [key, value] : map) {
         const int fd = uidClientMap[key]->fd;
         ServerPusher::getInstance().server_push(fd, PushMessage{"move", {
             {"room_id", room_id},
             {"player_id", user_id},
             {"stone", stone},
+            {"board", room->board}
         }});
     }
     
     // 7. 添加定时器，如果对手超时没落子，就判负
     // 获取对手的id
     std::string opponent_id;
-    for (const auto& [key, value] : room.players) {
-        if (value.color != "X" && value.id != user_id) {
-            opponent_id = value.id;
+    for (const auto& [key, value] : room->players) {
+        if (value->color != "X" && value->id != user_id) {
+            opponent_id = value->id;
         }
     }
     TimerManager::instance().addTask(Timer::TIME_TASK_ID_WAITTING_MOVE, 30000, [room_id, opponent_id](){
         // push message for all
-        Room& room = g_rooms[room_id];
-        room.state = Room::ROOM_STATE_GAME_OVER;
+        std::shared_ptr<Room> room = g_rooms[room_id];
+        room->state = Room::ROOM_STATE_GAME_OVER;
 
-        std::map<std::string, Player>& map = room.players;
+        std::map<std::string, std::shared_ptr<Player>>& map = room->players;
         for (const auto& [key, value] : map) {
             const int fd = uidClientMap[key]->fd;
             ServerPusher::getInstance().server_push(fd, PushMessage{"move_timeout", {

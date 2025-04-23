@@ -17,9 +17,9 @@ const std::string KEY_USER_PREFIX = "user_id_";
 const int AUTO_MATCH_DURATION = 30 * 200;
 
 // <user_id, Player>
-extern std::map<std::string, Player> g_players;
+extern std::map<std::string, std::shared_ptr<Player>> g_players;
 
-extern std::map<std::string, Room> g_rooms;
+extern std::map<std::string, std::shared_ptr<Room>> g_rooms;
 
 // <fd, client>
 extern std::map<int, std::shared_ptr<Client>> clientMap;
