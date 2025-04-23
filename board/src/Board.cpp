@@ -73,18 +73,18 @@ int Board::move(int x, int y, char player) {
     this->current = node;
 
     // remove captured stones
-    std::vector<Stone> killedList;
+    std::vector<std::shared_ptr<Stone>> killedList;
     scanAndRemove(get_opponent(player), *(this->current->data), killedList);
 
     return 1;
 }
 
 // 扫描全盘，获取被拿掉的棋子
-void Board::scanKilled(int player, BitArray2D& data, std::vector<Stone>& markList) {
+void Board::scanKilled(int player, BitArray2D& data, std::vector<std::shared_ptr<Stone>>& markList) {
     for (int x=0; x<this->width; x++) {
         for (int y=0; y<this->height; y++) {
             if (data[x][y] != player) continue;
-            std::vector<Stone> list; 
+            std::vector<std::shared_ptr<Stone>> list; 
             if (hasLiberty(x, y, player, data, list) == 0) {
                 markList.insert(markList.end(), list.begin(), list.end());
             }
@@ -93,13 +93,13 @@ void Board::scanKilled(int player, BitArray2D& data, std::vector<Stone>& markLis
 }
 
 // 扫描棋盘，移除无气的棋子
-void Board::scanAndRemove(int player, BitArray2D& data, std::vector<Stone>& markList) {
+void Board::scanAndRemove(int player, BitArray2D& data, std::vector<std::shared_ptr<Stone>>& markList) {
     scanKilled(player, data, markList);
 
     // remove
-    for (Stone one : markList) {
-        int x = one.x;
-        int y = one.y;
+    for (auto one : markList) {
+        int x = one->x;
+        int y = one->y;
         data[x][y] = '0';
     }
 
@@ -135,7 +135,7 @@ int Board::isSuicide(int x, int y, char player, BitArray2D data) {
 
     // 1. 如果有气，不算自杀
     BitArray2D tmp = data;
-    std::vector<Stone> list;
+    std::vector<std::shared_ptr<Stone>> list;
     if (hasLiberty(x, y, player, tmp, list)) {
         log("isSuicide() hasLiberty > 0");
         return 0;
@@ -143,7 +143,7 @@ int Board::isSuicide(int x, int y, char player, BitArray2D data) {
 
     // 2. 如果没气，但是提吃了对方的棋子，不算自杀
     BitArray2D copy = data;
-    std::vector<Stone> killedList;
+    std::vector<std::shared_ptr<Stone>> killedList;
     scanAndRemove(get_opponent(player), copy, killedList);
     if (killedList.size() > 1) {
         log("isSuicide() killedList.size()");
@@ -169,7 +169,7 @@ int Board::isSuicide(int x, int y, char player, BitArray2D data) {
 }
 
 // 当这个位置落子后，是否有气
-int Board::hasLiberty(int x, int y, char player, BitArray2D& tmp, std::vector<Stone>& markList) {
+int Board::hasLiberty(int x, int y, char player, BitArray2D& tmp, std::vector<std::shared_ptr<Stone>>& markList) {
     if (x < 0 || x >= this->width) return 0;
     if (y < 0 || y >= this->height) return 0;
     if (tmp[x][y] == 'X') return 0;
@@ -178,7 +178,8 @@ int Board::hasLiberty(int x, int y, char player, BitArray2D& tmp, std::vector<St
 
     // 标记为已检查
     tmp[x][y] = 'X';
-    markList.push_back(*(new Stone(x, y, player)));
+    std::shared_ptr<Stone> stone = std::make_shared<Stone>(x, y, player);
+    markList.push_back(stone);
 
     // 递归检查上下左右
     int hasLiberty = 0;

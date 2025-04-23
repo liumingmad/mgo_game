@@ -55,17 +55,17 @@ public:
     ~Core(){}
 
     // 基于应答的状态机
-    int run(Message& msg);
-    void on_auth_success(int fd, std::string token);
-    void do_sign_in(Message &msg, Request &request);
-    void do_get_room_list(Message &msg, Request &request);
-    void do_create_room(Message &msg, Request &request);
-    void do_enter_room(Message &msg, Request &request);
-    void do_exit_room(Message &msg, Request &request);
-    void do_match_player(Message &msg, Request &request);
-    void do_get_room_info(Message &msg, Request &request);
+    int run(const Message& msg);
+    void on_auth_success(const int fd, const std::string token);
+    void do_sign_in(const Message &msg, const Request &request);
+    void do_get_room_list(const Message &msg, const Request &request);
+    void do_create_room(const Message &msg, const Request &request);
+    void do_enter_room(const Message &msg, const Request &request);
+    void do_exit_room(const Message &msg, const Request &request);
+    void do_match_player(const Message &msg, const Request &request);
+    void do_get_room_info(const Message &msg, const Request &request);
 
-    void do_waitting_move(Message &msg, Request &request);
+    void do_waitting_move(const Message &msg, const Request &request);
 };
 
 #endif // CORE_H

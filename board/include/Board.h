@@ -16,10 +16,10 @@ private:
 
 public:
     int check(int x, int y, char player);
-    int hasLiberty(int x, int y, char player, BitArray2D& board, std::vector<Stone>& markList);
+    int hasLiberty(int x, int y, char player, BitArray2D& board, std::vector<std::shared_ptr<Stone>>& markList);
     int isSuicide(int x, int y, char player, BitArray2D data);
-    void scanKilled(int player, BitArray2D& data, std::vector<Stone>& markList);
-    void scanAndRemove(int player, BitArray2D& data, std::vector<Stone>& markList);
+    void scanKilled(int player, BitArray2D& data, std::vector<std::shared_ptr<Stone>>& markList);
+    void scanAndRemove(int player, BitArray2D& data, std::vector<std::shared_ptr<Stone>>& markList);
 
     Board();
     Board(int w, int h);

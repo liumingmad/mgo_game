@@ -154,11 +154,11 @@ int Server::handle_request(std::shared_ptr<Client> client) {
         // 3.把数据放入Message, 交给线程池处理
         char tmp[len];
         rb->peek(tmp, len);
-        Message* msg = new Message();
+        std::shared_ptr<Message> msg = std::shared_ptr<Message>();
         msg->fd = client->fd;
         msg->header = header;
         msg->text = std::string(tmp+HEADER_SIZE, header->data_length);
-        client->queue.enqueue(*msg);
+        client->queue.enqueue(msg);
 
         // 4. 删除处理过的数据
         rb->pop(nullptr, len);
@@ -177,19 +177,19 @@ int Server::handle_request(std::shared_ptr<Client> client) {
 void Server::handle_message(std::shared_ptr<Client> client) {
     // 加锁的原因是，不想让多个线程同时处理一个连接的消息
     std::unique_lock<std::mutex> lock(client->mutex);
-    SafeQueue<Message>& queue = client->queue;
+    SafeQueue<std::shared_ptr<Message>>& queue = client->queue;
     while (!queue.empty()) {
-        Message msg;
+        std::shared_ptr<Message> msg;
         if (queue.dequeue(msg)) {
-            if (msg.header->command == ProtocolHeader::HEADER_COMMAND_HEART) {
-                int fd = msg.fd;
+            if (msg->header->command == ProtocolHeader::HEADER_COMMAND_HEART) {
+                int fd = msg->fd;
                 TimerManager::instance().addTask(Timer::TIME_TASK_ID_HEARTBEAT, 30000, [this, fd](){
                     this->heart_timeout(fd);
                 });
-                std::cout << msg.fd << ":" << msg.text << std::endl;
-                response_heartbeat(msg.fd);
+                std::cout << msg->fd << ":" << msg->text << std::endl;
+                response_heartbeat(msg->fd);
             } else {
-                client->core->run(msg);
+                client->core->run(*msg);
             }
         }
     }

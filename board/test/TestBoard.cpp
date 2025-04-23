@@ -18,12 +18,12 @@ void testHasLiberty() {
     tmp[2][1] = 'W';
     print_board(tmp);
 
-    std::vector<Stone> list;
+    std::vector<std::shared_ptr<Stone>> list;
     int has = board->hasLiberty(1, 1, 'W', tmp, list);
     print_board(tmp);
     std::cout << "hasLiberty=" << has << std::endl;
-    for (Stone one : list) {
-        std::cout << one.x << "," << one.y << std::endl;
+    for (auto one : list) {
+        std::cout << one->x << "," << one->y << std::endl;
     }
 }
 
@@ -42,10 +42,10 @@ void testScanAndRemove() {
     tmp[2][1] = 'W';
     print_board(tmp);
 
-    std::vector<Stone> list;
+    std::vector<std::shared_ptr<Stone>> list;
     board->scanAndRemove('W', tmp, list);
-    for (Stone one : list) {
-        std::cout << one.x << "," << one.y << std::endl;
+    for (auto one : list) {
+        std::cout << one->x << "," << one->y << std::endl;
     }
     print_board(tmp);
 }

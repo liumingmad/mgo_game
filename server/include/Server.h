@@ -29,7 +29,7 @@ public:
 
     // 当执行queue中Message的过程中，不能执行队列中下一个
     std::mutex mutex;
-    SafeQueue<Message> queue;
+    SafeQueue<std::shared_ptr<Message>> queue;
 
     Client() : ringBuffer(std::make_shared<RingBuffer>(RING_BUFFER_SIZE)),
                core(std::make_shared<Core>())

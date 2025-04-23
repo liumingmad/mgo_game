@@ -15,7 +15,7 @@
 #include <server_push.h>
 #include "Stone.h"
 
-int writeResponse(Message &msg, Response response)
+int writeResponse(const Message &msg, const Response response)
 {
     nlohmann::json j = response;
     std::string json = j.dump();
@@ -27,7 +27,7 @@ int writeResponse(Message &msg, Response response)
     return 0;
 }
 
-void Core::do_sign_in(Message &msg, Request &request)
+void Core::do_sign_in(const Message &msg, const Request &request)
 {
     try
     {
@@ -53,7 +53,7 @@ void Core::do_sign_in(Message &msg, Request &request)
     }
 }
 
-void Core::do_get_room_list(Message &msg, Request &request)
+void Core::do_get_room_list(const Message &msg, const Request &request)
 {
     Response resp;
     resp.code = 200;
@@ -70,7 +70,7 @@ void Core::do_get_room_list(Message &msg, Request &request)
     writeResponse(msg, resp);
 }
 
-std::shared_ptr<Room> create_room(std::string user_id)
+std::shared_ptr<Room> create_room(const std::string user_id)
 {
     std::shared_ptr<Room> room = std::make_shared<Room>();
     auto now = std::chrono::system_clock::now();
@@ -80,7 +80,7 @@ std::shared_ptr<Room> create_room(std::string user_id)
     return room;
 }
 
-void Core::do_create_room(Message &msg, Request &request)
+void Core::do_create_room(const Message &msg, const Request &request)
 {
     std::shared_ptr<Room> room = create_room(m_user_id);
     g_rooms[room->id] = room;
@@ -92,7 +92,7 @@ void Core::do_create_room(Message &msg, Request &request)
     writeResponse(msg, resp);
 }
 
-void Core::do_enter_room(Message &msg, Request &request)
+void Core::do_enter_room(const Message &msg, const Request &request)
 {
     try
     {
@@ -118,7 +118,7 @@ void Core::do_enter_room(Message &msg, Request &request)
     }
 }
 
-void Core::do_exit_room(Message &msg, Request &request)
+void Core::do_exit_room(const Message &msg, const Request &request)
 {
     try
     {
@@ -134,7 +134,7 @@ void Core::do_exit_room(Message &msg, Request &request)
     }
 }
 
-void Core::do_get_room_info(Message &msg, Request &request)
+void Core::do_get_room_info(const Message &msg, const Request &request)
 {
     try
     {
@@ -152,7 +152,7 @@ void Core::do_get_room_info(Message &msg, Request &request)
 // 1.服务器先遍历申请人队列，如果有同级别的人，则匹配成功。
 // 如果申请人队列没匹配成功，则遍历player列表, 向同级别的player申请对局
 // 对方发送同意，则匹配成功
-void Core::do_match_player(Message &msg, Request &request)
+void Core::do_match_player(const Message &msg, const Request &request)
 {
     try
     {
@@ -280,7 +280,7 @@ void Core::on_auth_success(int fd, std::string token)
     AsyncEventBus::getInstance().asyncPublish<std::string>(EventHandler::EVENT_ONLINE, user_id);
 }
 
-int Core::run(Message &msg)
+int Core::run(const Message &msg)
 {
     Log::info("\n\n----------------------------");
 
@@ -384,7 +384,7 @@ int Core::run(Message &msg)
     return 0;
 }
 
-void Core::do_waitting_move(Message &msg, Request &request) {
+void Core::do_waitting_move(const Message &msg, const Request &request) {
     // 1. 通过room id获取room
     std::string room_id = request.data["room_id"].get<std::string>();
     std::shared_ptr<Room> room = g_rooms[room_id];
