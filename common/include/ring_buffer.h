@@ -24,7 +24,7 @@ public:
     }
 
     ~RingBuffer() {
-        delete buffer;
+        delete[] buffer;
     }
 
     size_t push(char *data, int len)

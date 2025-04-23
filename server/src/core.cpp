@@ -76,9 +76,6 @@ Room &create_room(std::string user_id)
     auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(now.time_since_epoch());
     room->id = user_id + "_" + std::to_string(duration.count());
     room->state = Room::ROOM_STATE_INIT;
-
-    room->board.move(2, 2, 'B');
-    room->board.move(2, 3, 'W');
     return *room;
 }
 
@@ -173,7 +170,7 @@ void Core::do_match_player(Message &msg, Request &request)
         }
 
         // 2. 找到对手p后，创建room，把me和p加入到room
-        int val = 1;//gen_random(0, 1);
+        int val = gen_random(0, 1);
         if (val == 1)
         {
             self.color = "B";
@@ -404,7 +401,7 @@ void Core::do_waitting_move(Message &msg, Request &request) {
     // 3. 检查是否轮到当前用户落子
     bool should_move = false;
     const Player& self = room.players[user_id]; 
-    bool self_is_black = self.color == "B";
+    bool self_is_black = (self.color == "B");
     if (self_is_black) {
         should_move = is_waitting_black;
     } else {
@@ -424,6 +421,12 @@ void Core::do_waitting_move(Message &msg, Request &request) {
     if (!success) {
         writeResponse(msg, Response{400, "move error, move()", {}});
         return;
+    }
+
+    if (is_waitting_black) {
+        room.state = Room::ROOM_STATE_WAITTING_WHITE_MOVE;
+    } else {
+        room.state = Room::ROOM_STATE_WAITTING_BLACK_MOVE;
     }
 
     // 6. 回复客户端200

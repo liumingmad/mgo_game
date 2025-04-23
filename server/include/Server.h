@@ -18,32 +18,33 @@
 constexpr size_t BUF_SIZE = 512;
 constexpr size_t RING_BUFFER_SIZE = 128 * 1024;
 
-class Client {
+class Client
+{
 public:
     int fd;
     struct sockaddr_in clientaddr;
-    RingBuffer* ringBuffer;
-    Core* core;
+    std::shared_ptr<RingBuffer> ringBuffer;
+    std::shared_ptr<Core> core;
     std::string user_id;
 
     // 当执行queue中Message的过程中，不能执行队列中下一个
     std::mutex mutex;
     SafeQueue<Message> queue;
 
-    Client() {
-        ringBuffer = new RingBuffer(RING_BUFFER_SIZE);
-        core = new Core();
+    Client() : ringBuffer(std::make_shared<RingBuffer>(RING_BUFFER_SIZE)),
+               core(std::make_shared<Core>())
+    {
     }
 
-    ~Client() {
-        delete ringBuffer;
-        delete core;
-    }
+    ~Client() {}
+
+    Client(Client& client) = delete;
+    Client& operator=(const Client&) = delete;
+    
 };
 
-
-
-class Server {
+class Server
+{
 private:
     int m_epfd;
     struct epoll_event m_epoll_event;
@@ -61,13 +62,10 @@ public:
     int handle_request(std::shared_ptr<Client> client);
     void handle_message(std::shared_ptr<Client> client);
     void heart_timeout(int fd);
-    
+
     int add_client(int fd, struct sockaddr_in addr);
     int remove_client(int fd);
     int shutdown();
 };
-
-
-
 
 #endif // SERVER_H

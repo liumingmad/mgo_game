@@ -3,8 +3,10 @@
 
 #include <string>
 #include <cstring>
+#include <memory>
 #include "protocol.h"
 #include "ring_buffer.h"
+
 
 /*
 自定义网络协议的协议头设计需要兼顾高效性、可扩展性和安全性，通常包含以下核心字段：
@@ -86,7 +88,7 @@ public:
     ~ProtocolParser() {}
 
     // 检查并删除ringbuffer中无效的data
-    void clear_invalid_data(RingBuffer *buf)
+    void clear_invalid_data(std::shared_ptr<RingBuffer> buf)
     {
         size_t size = buf->get_size();
         char tmp[size];
@@ -97,7 +99,7 @@ public:
     }
 
     // 检测ringbuffer里是否包含一个完整的协议, 如果存在，返回长度，不存在返回0
-    int exist_one_protocol(RingBuffer *rb)
+    int exist_one_protocol(std::shared_ptr<RingBuffer> rb)
     {
         if (rb->get_size() < HEADER_SIZE)
         {
@@ -124,7 +126,7 @@ public:
         return proc_len;
     }
 
-    ProtocolHeader *parse_header(RingBuffer *rb, int len)
+    std::shared_ptr<ProtocolHeader> parse_header(std::shared_ptr<RingBuffer> rb, int len)
     {
         if (len < HEADER_SIZE)
         {
@@ -140,7 +142,7 @@ public:
             return nullptr;
         }
 
-        ProtocolHeader *header = new ProtocolHeader();
+        std::shared_ptr<ProtocolHeader> header = std::make_shared<ProtocolHeader>();
 
         // version
         header->version = buf[4];

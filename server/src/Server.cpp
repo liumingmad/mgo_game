@@ -137,7 +137,7 @@ int Server::handle_request(std::shared_ptr<Client> client) {
     }
 
     // 查看ringbuffer中是否残存数据, 如果存在，就沾包
-    RingBuffer* rb = client->ringBuffer;
+    std::shared_ptr<RingBuffer> rb = client->ringBuffer;
     rb->push(buf, n);
 
     ProtocolParser parser;
@@ -149,7 +149,7 @@ int Server::handle_request(std::shared_ptr<Client> client) {
         }
 
         // 2.解析协议头
-        ProtocolHeader* header = parser.parse_header(rb, HEADER_SIZE);
+        std::shared_ptr<ProtocolHeader> header = parser.parse_header(rb, HEADER_SIZE);
 
         // 3.把数据放入Message, 交给线程池处理
         char tmp[len];

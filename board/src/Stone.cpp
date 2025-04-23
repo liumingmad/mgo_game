@@ -14,10 +14,21 @@ Stone::~Stone() {
 }
 
 void to_json(nlohmann::json& j, const Stone& s) {
+    std::string color_str;
+    if (s.color == 'T') {
+        color_str = "T";
+    } else if (s.color == 'B') {
+        color_str = "B";
+    } else if (s.color == 'W') {
+        color_str = "W";
+    } else {
+        color_str = "X";
+    }
+
     j = nlohmann::json{
         {"x", s.x},
         {"y", s.y},
-        {"color", s.color},
+        {"color", color_str},
     };
 }
 

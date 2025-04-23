@@ -1,6 +1,7 @@
 #include <iostream>
 #include "client.h"
 #include "protocol.h"
+#include <memory>
 
 
 int32_t bytesToInt(const uint8_t bytes[4]) {
@@ -48,7 +49,7 @@ void write_buffer(uint8_t* buf, int data_len)
     
 }
 
-int read_procotol(MgoClient client, RingBuffer* rb) {
+int read_procotol(MgoClient client, std::shared_ptr<RingBuffer> rb) {
     char buf[4*1024] = { 0 };
     int n = client.socket_read(buf);
     if (n == 0) {
@@ -66,7 +67,7 @@ int read_procotol(MgoClient client, RingBuffer* rb) {
             break;
         }
 
-        ProtocolHeader* header = parser.parse_header(rb, HEADER_SIZE);
+        std::shared_ptr<ProtocolHeader> header = parser.parse_header(rb, HEADER_SIZE); 
         char tmp[len];
         rb->peek(tmp, len);
         std::string str = std::string(tmp+HEADER_SIZE, header->data_length);
@@ -83,7 +84,7 @@ void run_client()
     MgoClient client;
     client.socket_init("127.0.0.1", 9001);
     client.socket_connect();
-    RingBuffer* rb = new RingBuffer(128*1024);
+    std::shared_ptr<RingBuffer> rb = std::make_shared<RingBuffer>(128*1024);
 
     char message[512] = { 0 };
     

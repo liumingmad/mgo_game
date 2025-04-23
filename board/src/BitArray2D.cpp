@@ -5,8 +5,8 @@ void BitArray2D::copy(const BitArray2D &other)
 {
     this->rows = other.rows;
     this->cols = other.cols;
-    this->data = new char[rows * cols];
-    for (int i = 0; i < rows * cols; i++) {
+    this->data = new char[rows * cols + 1];
+    for (int i = 0; i < rows * cols + 1; i++) {
         this->data[i] = other.data[i];
     }
 }
@@ -15,8 +15,9 @@ BitArray2D::BitArray2D(int rows, int cols)
 {
     this->rows = rows;
     this->cols = cols;
-    this->data = new char[rows * cols];
+    this->data = new char[rows * cols + 1];
     memset(this->data, '0', rows * cols);
+    this->data[rows * cols] = 0; 
 }
 
 BitArray2D::BitArray2D(const BitArray2D& other)

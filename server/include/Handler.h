@@ -10,7 +10,7 @@
 class Message {
 public:
     int fd;
-    ProtocolHeader* header;
+    std::shared_ptr<ProtocolHeader> header;
     std::string text; 
 };
 
