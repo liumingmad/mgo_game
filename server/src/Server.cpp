@@ -154,7 +154,7 @@ int Server::handle_request(std::shared_ptr<Client> client) {
         // 3.把数据放入Message, 交给线程池处理
         char tmp[len];
         rb->peek(tmp, len);
-        std::shared_ptr<Message> msg = std::shared_ptr<Message>();
+        std::shared_ptr<Message> msg = std::make_shared<Message>();
         msg->fd = client->fd;
         msg->header = header;
         msg->text = std::string(tmp+HEADER_SIZE, header->data_length);

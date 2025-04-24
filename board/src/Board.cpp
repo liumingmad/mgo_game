@@ -59,7 +59,7 @@ int Board::get(int x, int y) {
     return (*(this->current->data))[x][y];
 }
 
-int Board::move(int x, int y, char player) {
+int Board::move(int y, int x, char player) {
     if (check(x, y, player) == 0) return 0;
     if (isSuicide(x, y, player, *(this->current->data))) {
         Log::error("Error: move() is suicide.");
