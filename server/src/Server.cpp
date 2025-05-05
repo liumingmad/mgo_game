@@ -140,6 +140,9 @@ int Server::handle_request(std::shared_ptr<Client> client) {
     std::shared_ptr<RingBuffer> rb = client->ringBuffer;
     rb->push(buf, n);
 
+    // 1. 可能是http协议，需要处理登录/注册/profile
+    // 2. 可能是websocket协议，data部分是mogo协议，从web端过来的数据
+    // 3. 可能是mogo协议
     ProtocolParser parser;
     while (true) {
         // 1.在buffer中，检查是否存在一条完整的协议, 返回协议的全长
