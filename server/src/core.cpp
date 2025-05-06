@@ -36,6 +36,7 @@ void Core::do_sign_in(const Message &msg, const Request &request)
         if (!user)
         {
             writeResponse(msg, Response{400, "sign_in fail, token invalid", {}});
+            Log::info("Core::run() sign_in fail, token invalid");
             return;
         }
         // 创建token
@@ -380,8 +381,124 @@ int Core::run(const Message &msg)
     }
     else if (request.action == "point_counting") 
     {
+        do_point_counting(msg, request);
+    }
+    else if (request.action == "update_point_result") 
+    {
+        do_point_counting_result(msg, request);
     }
     return 0;
+}
+
+// 是否轮到user_id落子
+bool should_move(const std::shared_ptr<Room> room, const std::string& user_id) {
+    bool should_move = false;
+
+    bool is_waitting_black = room->state & Room::ROOM_STATE_WAITTING_BLACK_MOVE;
+    bool is_waitting_white = room->state & Room::ROOM_STATE_WAITTING_WHITE_MOVE;
+
+    std::shared_ptr<Player> p = room->players[user_id]; 
+    bool is_black = (p->color == "B");
+    bool is_white = (p->color == "W");
+    if (is_black) {
+        should_move = is_waitting_black;
+    } else if (is_white) {
+        should_move = is_waitting_white;
+    }
+    return should_move;
+}
+
+void Core::do_point_counting_result(const Message &msg, const Request &request) {
+    // 1. 通过room id获取room
+    std::string room_id = request.data["room_id"].get<std::string>();
+    std::shared_ptr<Room> room = g_rooms[room_id];
+    std::string user_id = extract_user_id(request.token);
+    std::shared_ptr<Player> self = room->players[user_id]; 
+
+    bool is_accept = request.data["state"];
+
+    // 是否是下棋的人
+    if (room->is_guest(self)) {
+        writeResponse(msg, Response{400, "You are not player, you are guest!", {}});
+        return;
+    } 
+
+    // 状态是否是正在选择
+    if (!room->is_counting_selecting(self)) {
+        writeResponse(msg, Response{400, "is_counting_selecting false", {}});
+        return;
+    }
+
+    // mark state
+    if (self->color == "B") {
+        room->m_point_counting_state = is_accept ? Room::COUNTING_STAT_BLACK_ACCEPT : Room::COUNTING_STAT_BLACK_REJECT;
+    } else {
+        room->m_point_counting_state = is_accept ? Room::COUNTING_STAT_WHITE_ACCEPT : Room::COUNTING_STAT_WHITE_REJECT;
+    }
+
+    // 操作成功
+    writeResponse(msg, Response{200, "mark state success", {}});
+
+    // 如果两个人都accept，则标记room状态, 推送game over到客户端
+    if (room->is_both_accept()) {
+        room->state = Room::ROOM_STATE_GAME_OVER;
+
+        // 对于黑方和白方，则提示确认目数
+        // 推送到room内所有人
+        std::map<std::string, std::shared_ptr<Player>>& map = room->players;
+        for (const auto& [key, value] : map) {
+            const int fd = uidClientMap[key]->fd;
+            ServerPusher::getInstance().server_push(fd, PushMessage{"point_counting_result", {
+                {"room_id", room_id},
+                {"score", room->board.getScore()},
+            }});
+        }
+    }
+}
+
+void Core::do_point_counting(const Message &msg, const Request &request) {
+    // 1. 通过room id获取room
+    std::string room_id = request.data["room_id"].get<std::string>();
+    std::shared_ptr<Room> room = g_rooms[room_id];
+    std::string user_id = extract_user_id(request.token);
+
+    // 2. 检查room状态，是否有人超时，或离线
+    bool is_waitting_black = room->state & Room::ROOM_STATE_WAITTING_BLACK_MOVE;
+    bool is_waitting_white = room->state & Room::ROOM_STATE_WAITTING_WHITE_MOVE;
+    if (!is_waitting_black && !is_waitting_white) {
+        writeResponse(msg, Response{400, "move error, room state is "+room->state, {}});
+        return;
+    } 
+
+    // 3. 检查是否轮到当前用户落子
+    if (!should_move(room, user_id)) {
+        writeResponse(msg, Response{400, "move error, your should be not move", {}});
+        return;
+    }
+
+    // 暂停计时器
+    TimerManager::instance().removeTask(Timer::TIME_TASK_ID_WAITTING_MOVE);
+
+    // switch state
+    room->state = Room::ROOM_STATE_POINT_COUNTTING;
+
+    // 数目
+    const Board& board = room->board;
+    Score score = board.computeScore();
+
+    // 回复客户端200
+    writeResponse(msg, Response{200, "point counting success, please waitting another accept", {}});
+
+    // 推送到room内所有人
+    // 对于黑方和白方，则提示确认目数
+    std::map<std::string, std::shared_ptr<Player>>& map = room->players;
+    for (const auto& [key, value] : map) {
+        const int fd = uidClientMap[key]->fd;
+        ServerPusher::getInstance().server_push(fd, PushMessage{"point_counting_result", {
+            {"room_id", room_id},
+            {"score", score},
+        }});
+    }
 }
 
 void Core::do_waitting_move(const Message &msg, const Request &request) {
@@ -399,16 +516,7 @@ void Core::do_waitting_move(const Message &msg, const Request &request) {
     } 
 
     // 3. 检查是否轮到当前用户落子
-    bool should_move = false;
-    std::shared_ptr<Player> self = room->players[user_id]; 
-    bool self_is_black = (self->color == "B");
-    if (self_is_black) {
-        should_move = is_waitting_black;
-    } else {
-        should_move = is_waitting_white;
-    }
-
-    if (!should_move) {
+    if (!should_move(room, user_id)) {
         writeResponse(msg, Response{400, "move error, your should be not move", {}});
         return;
     }

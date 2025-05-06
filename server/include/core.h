@@ -66,6 +66,9 @@ public:
     void do_get_room_info(const Message &msg, const Request &request);
 
     void do_waitting_move(const Message &msg, const Request &request);
+    void do_point_counting(const Message &msg, const Request &request);
+    void Core::do_point_counting_result(const Message &msg, const Request &request);
+
 };
 
 #endif // CORE_H

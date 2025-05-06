@@ -180,6 +180,7 @@ int Server::handle_request(std::shared_ptr<Client> client) {
 void Server::handle_message(std::shared_ptr<Client> client) {
     // 加锁的原因是，不想让多个线程同时处理一个连接的消息
     std::unique_lock<std::mutex> lock(client->mutex);
+
     SafeQueue<std::shared_ptr<Message>>& queue = client->queue;
     while (!queue.empty()) {
         std::shared_ptr<Message> msg;

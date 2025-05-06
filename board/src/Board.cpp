@@ -55,6 +55,14 @@ int Board::getHeight() const {
     return this->height;
 }
 
+// TODO
+Score Board::computeScore() const {
+    Score score;
+    score.b_score = 10;
+    score.w_score = 20;
+    return score;
+}
+
 int Board::get(int x, int y) {
     return (*(this->current->data))[x][y];
 }
@@ -190,7 +198,7 @@ int Board::hasLiberty(int x, int y, char player, BitArray2D& tmp, std::vector<st
     return hasLiberty;
 }
 
-int Board::score(char player) {
-    return 0;
+Score Board::getScore() {
+    return this->score;
 }
 

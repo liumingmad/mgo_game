@@ -6,6 +6,12 @@
 #include "Node.h"
 #include "json.hpp"
 
+struct Score {
+    int w_score;
+    int b_score;
+};
+NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(Score, w_score, b_score)
+
 class Board
 {
 private:
@@ -13,6 +19,7 @@ private:
     int height;
     std::shared_ptr<Node> root;
     std::shared_ptr<Node> current;
+    Score score;
 
 public:
     int check(int x, int y, char player);
@@ -28,9 +35,10 @@ public:
     int getHeight() const;
     int get(int x, int y);
     int move(int x, int y, char player);
-    int score(char player);
+    Score getScore();
     std::shared_ptr<Node> getCurrentNode() const;
     std::shared_ptr<Node> getRootNode() const;
+    Score computeScore() const;    
 };
 
 
