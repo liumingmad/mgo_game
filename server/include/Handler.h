@@ -6,12 +6,13 @@
 #include <string>
 #include <memory>
 #include "protocol.h"
+#include "body.h"
 
 class Message {
 public:
     int fd;
     std::shared_ptr<ProtocolHeader> header;
-    std::string text; 
+    std::shared_ptr<Request> request;
 };
 
 #endif // HANDLE_H

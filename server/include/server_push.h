@@ -5,6 +5,7 @@
 #include <map>
 #include <atomic>
 #include "push_message.h"
+#include "wrap.h"
 
 
 // 服务器推送的序列号
@@ -32,6 +33,8 @@ public:
 
     int server_push(int fd, PushMessage message);
 };
+
+int writeResponse(std::shared_ptr<Message> msg, const Response response);
 
 
 #endif // SERVER_PUSH_H

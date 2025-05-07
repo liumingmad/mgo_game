@@ -21,8 +21,9 @@
 
 std::map<std::string, std::shared_ptr<Player>> g_players;
 std::map<std::string, std::shared_ptr<Room>> g_rooms;
-std::map<int, std::shared_ptr<Client>> clientMap;
-std::map<std::string, std::shared_ptr<Client>> uidClientMap;
+std::map<int, std::shared_ptr<Client>> g_clientMap;
+std::map<std::string, std::shared_ptr<Client>> g_uidClientMap;
+ThreadPool g_room_pool;
 
 int Server::init() {
     // 初始化数据库连接池
@@ -37,8 +38,11 @@ int Server::init() {
     redisPool.init();
     redisPool.getRedis().flushall();
 
-    // 线程池
+    // 处理room外request的线程池
     m_pool.init();
+
+    // 处理room内request的线程池
+    g_room_pool.init();
 
     // 事件总线
     AsyncEventBus& bus = AsyncEventBus::getInstance();
@@ -54,6 +58,7 @@ int Server::init() {
 
 int Server::shutdown() {
     m_pool.shutdown();
+    g_room_pool.shutdown();
     AsyncEventBus::getInstance().stop();
     return 0;
 }
@@ -106,7 +111,7 @@ int Server::run(int port)
                     add_client(clientfd, clientaddr);
 
                 } else {
-                    if (handle_request(clientMap[fd]) == 0) {
+                    if (handle_request(g_clientMap[fd]) == 0) {
                         Epoll_ctl(m_epfd, EPOLL_CTL_DEL, fd, &m_epoll_event);
                         Close(fd);
                         remove_client(fd);
@@ -120,12 +125,20 @@ int Server::run(int port)
     return 0;
 }
 
-int writeResponse(int fd, std::string response)
-{
-    const char *text = response.c_str();
-    int len = response.length();
-    Write(fd, text, len);
-    return 0;
+std::shared_ptr<Request> parseRequest(const std::string& jsonStr) {
+    try {
+        nlohmann::json j = nlohmann::json::parse(jsonStr);
+        auto request = std::make_shared<Request>(j.get<Request>());
+        std::cout << "解析成功: " << j.dump(2) << std::endl;
+        return request;
+    }
+    catch (const nlohmann::json::parse_error &e) {
+        std::cerr << "JSON 解析错误: " << e.what() << ", 字节 " << e.byte << std::endl;
+    }
+    catch (const std::exception &e) {
+        std::cerr << "其他错误: " << e.what() << std::endl;
+    }
+    return nullptr;
 }
 
 int Server::handle_request(std::shared_ptr<Client> client) {
@@ -160,7 +173,7 @@ int Server::handle_request(std::shared_ptr<Client> client) {
         std::shared_ptr<Message> msg = std::make_shared<Message>();
         msg->fd = client->fd;
         msg->header = header;
-        msg->text = std::string(tmp+HEADER_SIZE, header->data_length);
+        msg->request = parseRequest(std::string(tmp+HEADER_SIZE, header->data_length));
         client->queue.enqueue(msg);
 
         // 4. 删除处理过的数据
@@ -190,10 +203,10 @@ void Server::handle_message(std::shared_ptr<Client> client) {
                 TimerManager::instance().addTask(Timer::TIME_TASK_ID_HEARTBEAT, 30000, [this, fd](){
                     this->heart_timeout(fd);
                 });
-                std::cout << msg->fd << ":" << msg->text << std::endl;
+                std::cout << msg->fd << ": HEADER_COMMAND_HEART" << std::endl;
                 response_heartbeat(msg->fd);
             } else {
-                client->core->run(*msg);
+                client->core->run(msg);
             }
         }
     }
@@ -222,8 +235,8 @@ int Server::add_client(int fd, struct sockaddr_in addr) {
     std::shared_ptr<Client> client = std::make_shared<Client>();
     client->fd = fd;
     client->clientaddr = addr;
-    clientMap.insert({fd, client});
-    // printMap(clientMap);
+    g_clientMap.insert({fd, client});
+    // printMap(g_clientMap);
 
     // TimerManager::instance().addTask(Timer::TIME_TASK_ID_HEARTBEAT, 30000, [this, fd](){
     //     heart_timeout(fd);
@@ -234,12 +247,12 @@ int Server::add_client(int fd, struct sockaddr_in addr) {
 int Server::remove_client(int fd) {
     std::cout << "remove client " << fd << std::endl;
 
-    std::shared_ptr<Client> client = clientMap[fd];
+    std::shared_ptr<Client> client = g_clientMap[fd];
     std::string user_id = client->user_id;
 
     if (!user_id.empty()) {
         // 删除user_id和client的对应关系
-        uidClientMap.erase(client->user_id);
+        g_uidClientMap.erase(client->user_id);
 
         // 清除redis缓存
         const std::string key_user_id = KEY_USER_PREFIX + user_id;
@@ -252,8 +265,8 @@ int Server::remove_client(int fd) {
         // }
     }
 
-    clientMap.erase(fd);
-    // printMap(clientMap);
+    g_clientMap.erase(fd);
+    // printMap(g_clientMap);
 
     AsyncEventBus::getInstance().asyncPublish(EventHandler::EVENT_OFFLINE, user_id);
 

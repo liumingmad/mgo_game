@@ -22,9 +22,11 @@ extern std::map<std::string, std::shared_ptr<Player>> g_players;
 extern std::map<std::string, std::shared_ptr<Room>> g_rooms;
 
 // <fd, client>
-extern std::map<int, std::shared_ptr<Client>> clientMap;
+extern std::map<int, std::shared_ptr<Client>> g_clientMap;
 // <user_id, client>
-extern std::map<std::string, std::shared_ptr<Client>> uidClientMap;
+extern std::map<std::string, std::shared_ptr<Client>> g_uidClientMap;
+
+extern ThreadPool g_room_pool;
 
 
 #endif // GLOBAL_H

@@ -19,6 +19,7 @@ private:
 public:
     static const int TIME_TASK_ID_HEARTBEAT = 1; 
     static const int TIME_TASK_ID_WAITTING_MOVE = 2; 
+    static const int TIME_TASK_ID_COUNTDOWN = 3;
 
     Timer()
     {

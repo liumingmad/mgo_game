@@ -36,15 +36,7 @@ private:
         FINISH,     // 游戏结束
     };
 
-    enum GameState {
-        PAUSE_OFFLINE,              // 计时器暂停, 对手掉线
-        WAITTING_MOVE,        // 计时器开启, 等待黑棋落子  
-        COUNTING_POINTS,            // 计时器暂停, 等待对方确认, 计算棋盘点数
-        GAME_OVER,                  // 计时器暂停, 游戏结束
-    };
-
     CoreState m_state;
-    GameState m_game_state;
     std::string m_user_id;
 
 public:
@@ -55,20 +47,14 @@ public:
     ~Core(){}
 
     // 基于应答的状态机
-    int run(const Message& msg);
+    int run(std::shared_ptr<Message> msg);
+    void handle_room_request(std::shared_ptr<Message> msg);
+
     void on_auth_success(const int fd, const std::string token);
-    void do_sign_in(const Message &msg, const Request &request);
-    void do_get_room_list(const Message &msg, const Request &request);
-    void do_create_room(const Message &msg, const Request &request);
-    void do_enter_room(const Message &msg, const Request &request);
-    void do_exit_room(const Message &msg, const Request &request);
-    void do_match_player(const Message &msg, const Request &request);
-    void do_get_room_info(const Message &msg, const Request &request);
-
-    void do_waitting_move(const Message &msg, const Request &request);
-    void do_point_counting(const Message &msg, const Request &request);
-    void Core::do_point_counting_result(const Message &msg, const Request &request);
-
+    void do_sign_in(std::shared_ptr<Message> msg);
+    void do_get_room_list(std::shared_ptr<Message> msg);
+    void do_create_room(std::shared_ptr<Message> msg);
+    void do_match_player(std::shared_ptr<Message> msg);
 };
 
 #endif // CORE_H
