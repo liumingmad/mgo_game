@@ -129,17 +129,8 @@ public:
 
     void switchRoomState(int newState);
 
-    Room() {}
+    Room():core(std::make_shared<RoomCore>()) {}
     ~Room() {}
-    /*
-       std::string id;
-    std::map<std::string, std::shared_ptr<Player>> players;
-    int state = ROOM_STATE_INIT;
-    Board board;
-    Score score;
-    std::shared_ptr<RemainTime> mWhiteRemainTime;
-    std::shared_ptr<RemainTime> mBlackRemainTime; 
-    */
     Room(const Room &one) {
         this->id = one.id;
         this->players = one.players;
