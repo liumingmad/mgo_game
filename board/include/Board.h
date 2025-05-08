@@ -35,7 +35,7 @@ public:
     int getHeight() const;
     int get(int x, int y);
     int move(int x, int y, char player);
-    Score getScore();
+    Score getScore() const;
     std::shared_ptr<Node> getCurrentNode() const;
     std::shared_ptr<Node> getRootNode() const;
     Score computeScore() const;    

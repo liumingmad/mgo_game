@@ -9,41 +9,49 @@
 #include "Node.h"
 #include "ThreadPool.h"
 #include "room_core.h"
+#include "player.h"
+#include "TimerManager.h"
+#include "timer.h"
 
-class RemainTime
+
+struct InitClockTime
+{
+    int preTime;
+    int readSecondCount;
+    int moveTime;
+};
+
+class RClock
 {
 private:
+    const InitClockTime Init_Time;
+
     // 保留时间
-    const int Pre_Time;
     int mPreTime;
 
     // 读秒次数
-    const int Read_Second_Count;
     int mReadSecondCount;
 
     // 每步棋的的剩余时间
-    const int Move_Time;
     int mMoveTime;
 
 public:
-    RemainTime(int preTime, int readSecondCount, int moveTime)
-        : Pre_Time(preTime),
-          mPreTime(preTime),
-          Read_Second_Count(readSecondCount),
-          mReadSecondCount(readSecondCount),
-          Move_Time(moveTime),
-          mMoveTime(moveTime)
+    RClock(InitClockTime time)
+        : Init_Time(time),
+            mPreTime(time.preTime),
+            mReadSecondCount(time.readSecondCount),
+            mMoveTime(time.moveTime)
     {
     }
 
-    ~RemainTime()
+    ~RClock()
     {
     }
 
-    RemainTime(RemainTime &one) = delete;
-    RemainTime &operator=(const RemainTime &one) = delete;
-    RemainTime(RemainTime&&) = default;
-    RemainTime& operator=(RemainTime&&) = default;
+    RClock(RClock &one) = delete;
+    RClock &operator=(const RClock &one) = delete;
+    RClock(RClock &&) = default;
+    RClock &operator=(RClock &&) = default;
 
     int getPreTime() const
     {
@@ -71,7 +79,7 @@ public:
         if (mMoveTime == 0)
         {
             mReadSecondCount--;
-            mMoveTime = Move_Time;
+            mMoveTime = Init_Time.moveTime;
         }
 
         if (mReadSecondCount == 0)
@@ -82,21 +90,113 @@ public:
     }
 };
 
+class GoClock
+{
+private:
+    std::atomic<bool> mRunning = false;
+    std::atomic<bool> mWaitingBlackMove = true;
+    std::shared_ptr<RClock> mBClock;
+    std::shared_ptr<RClock> mWClock;
+    std::function<void(int)> mCallback;
+
+public:
+    GoClock(InitClockTime time) : mBClock(std::make_shared<RClock>(time)),
+                                    mWClock(std::make_shared<RClock>(time))
+    {
+    }
+    ~GoClock() {}
+
+    void setCallback(std::function<void(int)> cb)
+    {
+        mCallback = cb;
+    }
+
+    void countdown()
+    {
+        TimerManager::instance().addTask(Timer::TIME_TASK_ID_COUNTDOWN, 1000, [&]()
+                                            {
+        if (!mRunning.load(std::memory_order_acquire)) return;
+
+        if (mWaitingBlackMove.load(std::memory_order_acquire)) {
+            mBClock->subOne();
+        } else {
+            mWClock->subOne();
+        }
+
+        if (mCallback) {
+            mCallback(1);
+        }
+
+        countdown(); });
+    }
+
+    void start()
+    {
+        mRunning.store(true, std::memory_order_release);
+        countdown();
+    }
+
+    void stop()
+    {
+        mRunning.store(false, std::memory_order_release);
+    }
+
+    void blackTap()
+    {
+        mWaitingBlackMove.store(false, std::memory_order_release);
+    }
+
+    void whiteTap()
+    {
+        mWaitingBlackMove.store(true, std::memory_order_release);
+    }
+};
+
+enum RoomRole
+{
+    BLACK_PLAYER,
+    WHITE_PLAYER,
+    GUEST,
+    UNKNOW
+};
+
 class Room
 {
+private:
+    int mState = ROOM_STATE_INIT;
+    std::string mId;
+    std::shared_ptr<Player> mBlackPlayer;
+    std::shared_ptr<Player> mWhitePlayer;
+    std::map<std::string, std::shared_ptr<Player>> mGuest;
+    Board mBoard;
+    Score mScore;
+    InitClockTime mInitClockTime;
+    std::shared_ptr<GoClock> mGoClock;
+    uint8_t mPointCountingState = COUNTING_STAT_INIT;
+
 public:
+    std::string getId() const;
+    int getState() const;
+    std::map<std::string, std::shared_ptr<Player>> getGuests() const;
+    Board &getBoard();
+    const Board &getConstBoard() const;
+
+    void setBlackPlayer(std::shared_ptr<Player> p);
+    void setWhitePlayer(std::shared_ptr<Player> p);
+    std::shared_ptr<Player> getBlackPlayer() const;
+    std::shared_ptr<Player> getWhitePlayer() const;
+    void createGoClock(InitClockTime time);
+    bool addGuest(std::shared_ptr<Player>);
+    bool removeGuest(std::shared_ptr<Player>);
+    RoomRole getRole(std::shared_ptr<Player>) const;
+
+
+    void start();
+
     // 当执行queue中Message的过程中，不能执行队列中下一个
     std::mutex mutex;
     SafeQueue<std::shared_ptr<Message>> queue;
     std::shared_ptr<RoomCore> core;
-
-    std::string id;
-    std::map<std::string, std::shared_ptr<Player>> players;
-    int state = ROOM_STATE_INIT;
-    Board board;
-    Score score;
-    std::shared_ptr<RemainTime> mWhiteRemainTime;
-    std::shared_ptr<RemainTime> mBlackRemainTime;
 
     // 数目的状态
     // 每个人有三种状态：argee/reject/selecting
@@ -108,8 +208,8 @@ public:
     static const u_int8_t COUNTING_STAT_WHITE_ACCEPT = 1 << 3;
     static const u_int8_t COUNTING_STAT_WHITE_REJECT = 1 << 4;
     static const u_int8_t COUNTING_STAT_WHITE_SELECTING = 1 << 5;
-    uint8_t m_point_counting_state = COUNTING_STAT_INIT;
 
+    void switchPointCountingState(u_int8_t new_state);
 
     // 使用二进制位表示
     // 0: 等待黑棋落子
@@ -129,35 +229,23 @@ public:
 
     void switchRoomState(int newState);
 
-    Room():core(std::make_shared<RoomCore>()) {}
-    ~Room() {}
-    Room(const Room &one) {
-        this->id = one.id;
-        this->players = one.players;
-        this->state = one.state;
-        this->board = one.board;
-        this->score = one.score;
-    }
-    Room &operator=(const Room &one) {
-        if (this == &one) return *this;
+    // 倒计时，每3秒调用一次
+    void countdown();
 
-        this->id = one.id;
-        this->players = one.players;
-        this->state = one.state;
-        this->board = one.board;
-        this->score = one.score;
-        return *this;
-    }
-    Room(Room&&) = default;
-    Room& operator=(Room&&) = default;
+    Room(std::string id);
+    ~Room();
+
+    Room(const Room &one);
+    Room &operator=(const Room &one);
+    void clone(const Room &other);
+
+    Room(Room &&) = default;
+    Room &operator=(Room &&) = default;
 
     bool is_guest(std::shared_ptr<Player> p) const;
     bool is_player(std::shared_ptr<Player> p) const;
     bool is_counting_selecting(std::shared_ptr<Player> p) const;
     bool is_both_accept() const;
-
-    // 倒计时，每3秒调用一次
-    void countdown();
 };
 
 void to_json(nlohmann::json &j, const Room &r);

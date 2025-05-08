@@ -16,9 +16,11 @@ struct PushMessage
 };
 NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(PushMessage, action, data)
 
-struct StartGameBody
+class StartGameBody
 {
+public:
     Room room;
+    StartGameBody(Room r):room(r) {}
 };
 NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(StartGameBody, room)
 

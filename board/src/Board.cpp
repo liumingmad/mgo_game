@@ -198,7 +198,7 @@ int Board::hasLiberty(int x, int y, char player, BitArray2D& tmp, std::vector<st
     return hasLiberty;
 }
 
-Score Board::getScore() {
+Score Board::getScore() const {
     return this->score;
 }
 

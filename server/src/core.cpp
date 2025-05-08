@@ -14,7 +14,7 @@
 #include <push_message.h>
 #include <server_push.h>
 #include "Stone.h"
-
+#include "player.h"
 
 void Core::do_sign_in(std::shared_ptr<Message> msg)
 {
@@ -63,116 +63,23 @@ void Core::do_get_room_list(std::shared_ptr<Message> msg)
 
 std::shared_ptr<Room> create_room(const std::string user_id)
 {
-    std::shared_ptr<Room> room = std::make_shared<Room>();
     auto now = std::chrono::system_clock::now();
     auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(now.time_since_epoch());
-    room->id = user_id + "_" + std::to_string(duration.count());
-    room->state = Room::ROOM_STATE_INIT;
+    std::string id = user_id + "_" + std::to_string(duration.count());
+    std::shared_ptr<Room> room = std::make_shared<Room>(id);
     return room;
 }
 
 void Core::do_create_room(std::shared_ptr<Message> msg)
 {
     std::shared_ptr<Room> room = create_room(m_user_id);
-    g_rooms[room->id] = room;
+    g_rooms[room->getId()] = room;
 
     Response resp;
     resp.code = 200;
     resp.message = "create_room success";
     resp.data = *(room.get());
     writeResponse(msg, resp);
-}
-
-// 0.客户端发送，匹配申请，服务端回复ok 最长等待30秒，客户端显示进度条,等待服务器推送
-// 1.服务器先遍历申请人队列，如果有同级别的人，则匹配成功。
-// 如果申请人队列没匹配成功，则遍历player列表, 向同级别的player申请对局
-// 对方发送同意，则匹配成功
-void Core::do_match_player(std::shared_ptr<Message> msg)
-{
-    try
-    {
-        writeResponse(msg, Response{200, "success, please waitting 30s", MatchPlayerResponse{AUTO_MATCH_DURATION}});
-
-        // 0. 从缓存中找自己的Player
-        std::shared_ptr<Player> self = g_players[m_user_id];
-
-        // 1. 找到对手, 从自动匹配队列中找
-        AutoPlayerMatcher &matcher = AutoPlayerMatcher::getInstance();
-        std::shared_ptr<Player> opponent = matcher.auto_match(*self);
-        if (!opponent)
-        {
-            matcher.enqueue_waitting(self);
-            return;
-        }
-
-        // 2. 找到对手p后，创建room，把me和p加入到room
-        int val = gen_random(0, 1);
-        if (val == 1)
-        {
-            self->color = "B";
-            opponent->color = "W";
-        }
-        else
-        {
-            self->color = "W";
-            opponent->color = "B";
-        }
-
-        std::shared_ptr<Room> room = create_room(m_user_id);
-        room->players[self->id] = self;
-        room->players[opponent->id] = opponent;
-        room->state = Room::ROOM_STATE_WAITTING_BLACK_MOVE;
-
-        MatchPlayerRequest req;
-        const nlohmann::json& j = msg->request->data;
-        from_json(j, req);
-        room->mBlackRemainTime = std::make_shared<RemainTime>(req.preTime, req.readSecondCount, req.moveTime);
-        room->mWhiteRemainTime = std::make_shared<RemainTime>(req.preTime, req.readSecondCount, req.moveTime);
-
-        g_rooms[room->id] = room;
-
-        // 4. 开启对弈模式，切换状态机等
-        m_state = GAMING;
-
-        // 5. 给两个人分别推送一条消息, 客户端之间跳转到room page开始下棋
-        StartGameBody body;
-        body.room = *room;
-
-        ServerPusher &pusher = ServerPusher::getInstance();
-        pusher.server_push(msg->fd, PushMessage{"start_game", body});
-
-        auto it = g_uidClientMap.find(opponent->id);
-        if (it != g_uidClientMap.end())
-        {
-            pusher.server_push(it->second->fd, PushMessage{"start_game", body});
-        }
-
-        // 开定时器，等待30秒，第一步
-        int fd = msg->fd;
-        std::string room_id = room->id;
-        std::string player_id;
-        if (self->color == "B") {
-            player_id = self->id;
-        } else {
-            player_id = opponent->id;
-        }
-        TimerManager::instance().addTask(Timer::TIME_TASK_ID_WAITTING_MOVE, 30000, [fd, room_id, player_id](){
-            std::cout << "invalid game" << std::endl; 
-            // 1. push message: invalid game
-            ServerPusher::getInstance().server_push(fd, PushMessage{"move_timeout", {
-                {"room_id", room_id},
-                {"player_id", player_id},
-            }});
-
-            // 2. set room state
-            std::shared_ptr<Room> room = g_rooms[room_id];
-            room->state = Room::ROOM_STATE_GAME_OVER;
-        });
-    }
-    catch (const std::exception &e)
-    {
-        std::cerr << "其他错误: " << e.what() << std::endl;
-    }
 }
 
 void Core::on_auth_success(int fd, std::string token)
@@ -211,6 +118,84 @@ void Core::on_auth_success(int fd, std::string token)
     g_uidClientMap.insert({p->id, client});
 
     AsyncEventBus::getInstance().asyncPublish<std::string>(EventHandler::EVENT_ONLINE, user_id);
+}
+
+// 0.客户端发送，匹配申请，服务端回复ok 最长等待30秒，客户端显示进度条,等待服务器推送
+// 1.服务器先遍历申请人队列，如果有同级别的人，则匹配成功。
+// 如果申请人队列没匹配成功，则遍历player列表, 向同级别的player申请对局
+// 对方发送同意，则匹配成功
+void Core::do_match_player(std::shared_ptr<Message> msg)
+{
+    try
+    {
+        writeResponse(msg, Response{200, "success, please waitting 30s", MatchPlayerResponse{AUTO_MATCH_DURATION}});
+
+        // 0. 从缓存中找自己的Player
+        std::shared_ptr<Player> self = g_players[m_user_id];
+
+        // 1. 找到对手, 从自动匹配队列中找
+        AutoPlayerMatcher &matcher = AutoPlayerMatcher::getInstance();
+        std::shared_ptr<Player> opponent = matcher.auto_match(*self);
+        if (!opponent)
+        {
+            matcher.enqueue_waitting(self);
+            return;
+        }
+
+        // 2. 找到对手p后，创建room，把me和p加入到room
+        std::shared_ptr<Room> room = create_room(m_user_id);
+
+        int val = gen_random(0, 1);
+        if (val == 1)
+        {
+            self->color = "B";
+            opponent->color = "W";
+            room->setBlackPlayer(self);
+            room->setWhitePlayer(opponent);
+        }
+        else
+        {
+            self->color = "W";
+            opponent->color = "B";
+            room->setBlackPlayer(opponent);
+            room->setWhitePlayer(self);
+        }
+
+        MatchPlayerRequest req;
+        const nlohmann::json& j = msg->request->data;
+        from_json(j, req);
+        InitClockTime time;
+        time.preTime = req.preTime;
+        time.readSecondCount = req.readSecondCount;
+        time.moveTime = req.moveTime;
+        room->createGoClock(time);
+
+        room->switchRoomState(Room::ROOM_STATE_WAITTING_BLACK_MOVE);
+
+        g_rooms[room->getId()] = room;
+
+        // 4. 开启对弈模式，切换状态机等
+        m_state = GAMING;
+
+        // 5. 给两个人分别推送一条消息, 客户端之间跳转到room page开始下棋
+        StartGameBody body(*room);
+
+        ServerPusher &pusher = ServerPusher::getInstance();
+        pusher.server_push(msg->fd, PushMessage{"start_game", body});
+
+        auto it = g_uidClientMap.find(opponent->id);
+        if (it != g_uidClientMap.end())
+        {
+            pusher.server_push(it->second->fd, PushMessage{"start_game", body});
+        }
+
+        // 开启倒计时
+        room->start();
+    }
+    catch (const std::exception &e)
+    {
+        std::cerr << "其他错误: " << e.what() << std::endl;
+    }
 }
 
 int Core::run(std::shared_ptr<Message> msg)

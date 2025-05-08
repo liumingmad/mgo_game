@@ -13,6 +13,9 @@
 #include <server_push.h>
 #include "Stone.h"
 #include "room_core.h"
+#include "room.h"
+#include <player.h>
+
 
 int RoomCore::run(std::shared_ptr<Message> msg) {
     if (msg->request->action == "enter_room")
@@ -51,18 +54,23 @@ void RoomCore::do_enter_room(std::shared_ptr<Message> msg)
     {
         std::string room_id = msg->request->data["room_id"].get<std::string>();
         std::shared_ptr<Room> room = g_rooms[room_id];
-        std::string user_id = extract_user_id(msg->request->token);
 
+        std::string user_id = extract_user_id(msg->request->token);
         auto it = g_players.find(user_id);
         if (it == g_players.end()) {
-            writeResponse(msg, Response{400, "enter_room failed", {}});
+            writeResponse(msg, Response{400, "find player failed", {}});
             return;
         }
 
         std::shared_ptr<Player> p = it->second;
-        room->players[p->id] = p;
-        writeResponse(msg, Response{200, "enter_room success", *room.get()});
+        RoomRole role = room->getRole(p);
+        if (role != RoomRole::UNKNOW) {
+            writeResponse(msg, Response{200, "role rejected", *room.get()});
+            return;
+        } 
 
+        room->addGuest(p);
+        writeResponse(msg, Response{200, "enter_room success", *room.get()});
     }
     catch (const std::exception &e)
     {
@@ -75,8 +83,24 @@ void RoomCore::do_exit_room(std::shared_ptr<Message> msg)
     try
     {
         std::string room_id = msg->request->data["room_id"].get<std::string>();
+        std::shared_ptr<Room> room = g_rooms[room_id];
+
         std::string user_id = extract_user_id(msg->request->token);
-        g_rooms[room_id]->players.erase(user_id);
+        auto it = g_players.find(user_id);
+        if (it == g_players.end()) {
+            writeResponse(msg, Response{400, "find player failed", {}});
+            return;
+        }
+
+        // 如果是棋手，不允许退出room, 只能通过认输退出
+        std::shared_ptr<Player> p = it->second;
+        RoomRole role = room->getRole(p);
+        if (role != RoomRole::GUEST) {
+            writeResponse(msg, Response{200, "exit_room role is not guest", {}});
+            return;
+        }
+
+        room->removeGuest(p);
         writeResponse(msg, Response{200, "exit_room success", {}});
     }
     catch (const std::exception &e)
@@ -103,12 +127,12 @@ void RoomCore::do_get_room_info(std::shared_ptr<Message> msg)
 bool should_move(const std::shared_ptr<Room> room, const std::string& user_id) {
     bool should_move = false;
 
-    bool is_waitting_black = room->state & Room::ROOM_STATE_WAITTING_BLACK_MOVE;
-    bool is_waitting_white = room->state & Room::ROOM_STATE_WAITTING_WHITE_MOVE;
+    int state = room->getState();
+    bool is_waitting_black = state & Room::ROOM_STATE_WAITTING_BLACK_MOVE;
+    bool is_waitting_white = state & Room::ROOM_STATE_WAITTING_WHITE_MOVE;
 
-    std::shared_ptr<Player> p = room->players[user_id]; 
-    bool is_black = (p->color == "B");
-    bool is_white = (p->color == "W");
+    bool is_black = room->getBlackPlayer()->id == user_id;
+    bool is_white = room->getWhitePlayer()->id == user_id;
     if (is_black) {
         should_move = is_waitting_black;
     } else if (is_white) {
@@ -125,13 +149,14 @@ void RoomCore::do_point_counting_result(std::shared_ptr<Message> msg) {
     // 1. 通过room id获取room
     std::string room_id = msg->request->data["room_id"].get<std::string>();
     std::shared_ptr<Room> room = g_rooms[room_id];
+
     std::string user_id = extract_user_id(msg->request->token);
-    std::shared_ptr<Player> self = room->players[user_id]; 
+    std::shared_ptr<Player> self = g_players[user_id]; 
 
     bool is_accept = msg->request->data["state"];
 
     // 是否是下棋的人
-    if (room->is_guest(self)) {
+    if (!room->is_player(self)) {
         writeResponse(msg, Response{400, "You are not player, you are guest!", {}});
         return;
     } 
@@ -144,9 +169,9 @@ void RoomCore::do_point_counting_result(std::shared_ptr<Message> msg) {
 
     // mark state
     if (self->color == "B") {
-        room->m_point_counting_state = is_accept ? Room::COUNTING_STAT_BLACK_ACCEPT : Room::COUNTING_STAT_BLACK_REJECT;
+        room->switchPointCountingState(is_accept ? Room::COUNTING_STAT_BLACK_ACCEPT : Room::COUNTING_STAT_BLACK_REJECT);
     } else {
-        room->m_point_counting_state = is_accept ? Room::COUNTING_STAT_WHITE_ACCEPT : Room::COUNTING_STAT_WHITE_REJECT;
+        room->switchPointCountingState(is_accept ? Room::COUNTING_STAT_WHITE_ACCEPT : Room::COUNTING_STAT_WHITE_REJECT);
     }
 
     // 操作成功
@@ -154,16 +179,16 @@ void RoomCore::do_point_counting_result(std::shared_ptr<Message> msg) {
 
     // 如果两个人都accept，则标记room状态, 推送game over到客户端
     if (room->is_both_accept()) {
-        room->state = Room::ROOM_STATE_GAME_OVER;
+        room->switchRoomState(Room::ROOM_STATE_GAME_OVER);
 
         // 对于黑方和白方，则提示确认目数
         // 推送到room内所有人
-        std::map<std::string, std::shared_ptr<Player>>& map = room->players;
+        const std::map<std::string, std::shared_ptr<Player>>& map = room->getGuests();
         for (const auto& [key, value] : map) {
             const int fd = g_uidClientMap[key]->fd;
             ServerPusher::getInstance().server_push(fd, PushMessage{"point_counting_result", {
                 {"room_id", room_id},
-                {"score", room->board.getScore()},
+                {"score", room->getBoard().getScore()},
             }});
         }
     }
@@ -176,10 +201,11 @@ void RoomCore::do_point_counting(std::shared_ptr<Message> msg) {
     std::string user_id = extract_user_id(msg->request->token);
 
     // 2. 检查room状态，是否有人超时，或离线
-    bool is_waitting_black = room->state & Room::ROOM_STATE_WAITTING_BLACK_MOVE;
-    bool is_waitting_white = room->state & Room::ROOM_STATE_WAITTING_WHITE_MOVE;
+    int state = room->getState();
+    bool is_waitting_black = state & Room::ROOM_STATE_WAITTING_BLACK_MOVE;
+    bool is_waitting_white = state & Room::ROOM_STATE_WAITTING_WHITE_MOVE;
     if (!is_waitting_black && !is_waitting_white) {
-        writeResponse(msg, Response{400, "move error, room state is "+room->state, {}});
+        writeResponse(msg, Response{400, "move error, room state is "+room->getState(), {}});
         return;
     } 
 
@@ -193,10 +219,10 @@ void RoomCore::do_point_counting(std::shared_ptr<Message> msg) {
     TimerManager::instance().removeTask(Timer::TIME_TASK_ID_WAITTING_MOVE);
 
     // switch state
-    room->state = Room::ROOM_STATE_POINT_COUNTTING;
+    room->switchRoomState(Room::ROOM_STATE_POINT_COUNTTING);
 
     // 数目
-    const Board& board = room->board;
+    const Board& board = room->getBoard();
     Score score = board.computeScore();
 
     // 回复客户端200
@@ -204,7 +230,7 @@ void RoomCore::do_point_counting(std::shared_ptr<Message> msg) {
 
     // 推送到room内所有人
     // 对于黑方和白方，则提示确认目数
-    std::map<std::string, std::shared_ptr<Player>>& map = room->players;
+    const std::map<std::string, std::shared_ptr<Player>>& map = room->getGuests();
     for (const auto& [key, value] : map) {
         const int fd = g_uidClientMap[key]->fd;
         ServerPusher::getInstance().server_push(fd, PushMessage{"point_counting_result", {
@@ -221,10 +247,11 @@ void RoomCore::do_waitting_move(std::shared_ptr<Message> msg) {
     std::string user_id = extract_user_id(msg->request->token);
 
     // 2. 检查room状态，是否有人超时，或离线
-    bool is_waitting_black = room->state & Room::ROOM_STATE_WAITTING_BLACK_MOVE;
-    bool is_waitting_white = room->state & Room::ROOM_STATE_WAITTING_WHITE_MOVE;
+    int state = room->getState();
+    bool is_waitting_black = state & Room::ROOM_STATE_WAITTING_BLACK_MOVE;
+    bool is_waitting_white = state & Room::ROOM_STATE_WAITTING_WHITE_MOVE;
     if (!is_waitting_black && !is_waitting_white) {
-        writeResponse(msg, Response{400, "move error, room state is "+room->state, {}});
+        writeResponse(msg, Response{400, "move error, room state is "+room->getState(), {}});
         return;
     } 
 
@@ -238,53 +265,53 @@ void RoomCore::do_waitting_move(std::shared_ptr<Message> msg) {
     Stone stone;
     const nlohmann::json& j = msg->request->data["stone"];
     from_json(j, stone);
-    int success = room->board.move(stone.x, stone.y, stone.color);
+    int success = room->getBoard().move(stone.x, stone.y, stone.color);
     if (!success) {
         writeResponse(msg, Response{400, "move error, move()", {}});
         return;
     }
 
     if (is_waitting_black) {
-        room->state = Room::ROOM_STATE_WAITTING_WHITE_MOVE;
+        room->switchRoomState(Room::ROOM_STATE_WAITTING_WHITE_MOVE);
     } else {
-        room->state = Room::ROOM_STATE_WAITTING_BLACK_MOVE;
+        room->switchRoomState(Room::ROOM_STATE_WAITTING_BLACK_MOVE);
     }
 
     // 6. 回复客户端200
     writeResponse(msg, Response{200, "move success", {}});
 
     // 5. 推送落子到room内所有人
-    std::map<std::string, std::shared_ptr<Player>>& map = room->players;
+    const std::map<std::string, std::shared_ptr<Player>>& map = room->getGuests();
     for (const auto& [key, value] : map) {
         const int fd = g_uidClientMap[key]->fd;
         ServerPusher::getInstance().server_push(fd, PushMessage{"move", {
             {"room_id", room_id},
             {"player_id", user_id},
             {"stone", stone},
-            {"board", room->board}
+            {"board", room->getBoard()}
         }});
     }
     
     // 7. 添加定时器，如果对手超时没落子，就判负
     // 获取对手的id
-    std::string opponent_id;
-    for (const auto& [key, value] : room->players) {
-        if (value->color != "X" && value->id != user_id) {
-            opponent_id = value->id;
-        }
-    }
-    TimerManager::instance().addTask(Timer::TIME_TASK_ID_WAITTING_MOVE, 30000, [room_id, opponent_id](){
-        // push message for all
-        std::shared_ptr<Room> room = g_rooms[room_id];
-        room->state = Room::ROOM_STATE_GAME_OVER;
+    // std::string opponent_id;
+    // for (const auto& [key, value] : room->players) {
+    //     if (value->color != "X" && value->id != user_id) {
+    //         opponent_id = value->id;
+    //     }
+    // }
+    // TimerManager::instance().addTask(Timer::TIME_TASK_ID_WAITTING_MOVE, 30000, [room_id, opponent_id](){
+    //     // push message for all
+    //     std::shared_ptr<Room> room = g_rooms[room_id];
+    //     room->state = Room::ROOM_STATE_GAME_OVER;
 
-        std::map<std::string, std::shared_ptr<Player>>& map = room->players;
-        for (const auto& [key, value] : map) {
-            const int fd = g_uidClientMap[key]->fd;
-            ServerPusher::getInstance().server_push(fd, PushMessage{"move_timeout", {
-                {"room_id", room_id},
-                {"player_id", opponent_id},
-            }});
-        }
-    });
+    //     std::map<std::string, std::shared_ptr<Player>>& map = room->players;
+    //     for (const auto& [key, value] : map) {
+    //         const int fd = g_uidClientMap[key]->fd;
+    //         ServerPusher::getInstance().server_push(fd, PushMessage{"move_timeout", {
+    //             {"room_id", room_id},
+    //             {"player_id", opponent_id},
+    //         }});
+    //     }
+    // });
 }
