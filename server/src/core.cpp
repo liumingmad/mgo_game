@@ -170,27 +170,10 @@ void Core::do_match_player(std::shared_ptr<Message> msg)
         time.moveTime = req.moveTime;
         room->createGoClock(time);
 
-        room->switchRoomState(Room::ROOM_STATE_WAITTING_BLACK_MOVE);
-
         g_rooms[room->getId()] = room;
 
-        // 4. 开启对弈模式，切换状态机等
-        m_state = GAMING;
+        room->switchRoomState(Room::ROOM_STATE_WAITTING_BLACK_MOVE);
 
-        // 5. 给两个人分别推送一条消息, 客户端之间跳转到room page开始下棋
-        StartGameBody body(*room);
-
-        ServerPusher &pusher = ServerPusher::getInstance();
-        pusher.server_push(msg->fd, PushMessage{"start_game", body});
-
-        auto it = g_uidClientMap.find(opponent->id);
-        if (it != g_uidClientMap.end())
-        {
-            pusher.server_push(it->second->fd, PushMessage{"start_game", body});
-        }
-
-        // 开启倒计时
-        room->start();
     }
     catch (const std::exception &e)
     {

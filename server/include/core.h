@@ -5,44 +5,15 @@
 #include <string>
 
 #include "Log.h"
-#include "Handler.h"
+#include "message.h"
 #include "body.h"
 
 class Core {
 private:
-    enum CoreState {
-        UNAUTH,     // 未鉴权: sign_in 
-
-        FREE,       // 鉴权通过: 
-                    // get_room_list
-                    // get_player_list
-                    // get_sgf_list
-                    // get_player_info
-                    // create_room
-                    // enter_room
-                    // sign_out
-
-        IN_ROOM,    // 创建房间后，进入这个状态。接受对局申请后，进入GAMING状态, 开始计时
-                    // match 
-                    // cancel_matching
-                    // leave_room
-                    // 
-
-        GAMING,     // 游戏中(子状态机:GameState)
-                    // admit_defeat
-                    // move
-                    // count_point
-
-        FINISH,     // 游戏结束
-    };
-
-    CoreState m_state;
     std::string m_user_id;
 
 public:
-    Core(){
-        m_state = UNAUTH;
-    }
+    Core(){}
 
     ~Core(){}
 

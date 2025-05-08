@@ -3,18 +3,18 @@
 #include "body.h"
 #include "cryptoUtils.h"
 #include "http_utils.h"
-#include <wrap.h>
+#include "wrap.h"
 #include "global.h"
 #include "protocol.h"
 #include "auto_match.h"
 #include <sw/redis++/redis++.h>
 #include <redis_pool.h>
-#include <push_message.h>
-#include <server_push.h>
+#include "push_message.h"
+#include "server_push.h"
 #include "Stone.h"
 #include "room_core.h"
 #include "room.h"
-#include <player.h>
+#include "player.h"
 
 
 int RoomCore::run(std::shared_ptr<Message> msg) {
@@ -184,12 +184,11 @@ void RoomCore::do_point_counting_result(std::shared_ptr<Message> msg) {
         // 对于黑方和白方，则提示确认目数
         // 推送到room内所有人
         const std::map<std::string, std::shared_ptr<Player>>& map = room->getGuests();
-        for (const auto& [key, value] : map) {
-            const int fd = g_uidClientMap[key]->fd;
-            ServerPusher::getInstance().server_push(fd, PushMessage{"point_counting_result", {
-                {"room_id", room_id},
-                {"score", room->getBoard().getScore()},
-            }});
+        for (const auto& [uid, value] : map) {
+            // ServerPusher::getInstance().server_push(uid, PushMessage{"point_counting_result", {
+            //     {"room_id", room_id},
+            //     {"score", room->getBoard().getScore()},
+            // }});
         }
     }
 }
@@ -231,12 +230,11 @@ void RoomCore::do_point_counting(std::shared_ptr<Message> msg) {
     // 推送到room内所有人
     // 对于黑方和白方，则提示确认目数
     const std::map<std::string, std::shared_ptr<Player>>& map = room->getGuests();
-    for (const auto& [key, value] : map) {
-        const int fd = g_uidClientMap[key]->fd;
-        ServerPusher::getInstance().server_push(fd, PushMessage{"point_counting_result", {
-            {"room_id", room_id},
-            {"score", score},
-        }});
+    for (const auto& [uid, value] : map) {
+        // ServerPusher::getInstance().server_push(uid, PushMessage{"point_counting_result", {
+        //     {"room_id", room_id},
+        //     {"score", score},
+        // }});
     }
 }
 
@@ -271,47 +269,14 @@ void RoomCore::do_waitting_move(std::shared_ptr<Message> msg) {
         return;
     }
 
+    // 6. 回复客户端200
+    writeResponse(msg, Response{200, "move success", {}});
+
     if (is_waitting_black) {
         room->switchRoomState(Room::ROOM_STATE_WAITTING_WHITE_MOVE);
     } else {
         room->switchRoomState(Room::ROOM_STATE_WAITTING_BLACK_MOVE);
     }
 
-    // 6. 回复客户端200
-    writeResponse(msg, Response{200, "move success", {}});
 
-    // 5. 推送落子到room内所有人
-    const std::map<std::string, std::shared_ptr<Player>>& map = room->getGuests();
-    for (const auto& [key, value] : map) {
-        const int fd = g_uidClientMap[key]->fd;
-        ServerPusher::getInstance().server_push(fd, PushMessage{"move", {
-            {"room_id", room_id},
-            {"player_id", user_id},
-            {"stone", stone},
-            {"board", room->getBoard()}
-        }});
-    }
-    
-    // 7. 添加定时器，如果对手超时没落子，就判负
-    // 获取对手的id
-    // std::string opponent_id;
-    // for (const auto& [key, value] : room->players) {
-    //     if (value->color != "X" && value->id != user_id) {
-    //         opponent_id = value->id;
-    //     }
-    // }
-    // TimerManager::instance().addTask(Timer::TIME_TASK_ID_WAITTING_MOVE, 30000, [room_id, opponent_id](){
-    //     // push message for all
-    //     std::shared_ptr<Room> room = g_rooms[room_id];
-    //     room->state = Room::ROOM_STATE_GAME_OVER;
-
-    //     std::map<std::string, std::shared_ptr<Player>>& map = room->players;
-    //     for (const auto& [key, value] : map) {
-    //         const int fd = g_uidClientMap[key]->fd;
-    //         ServerPusher::getInstance().server_push(fd, PushMessage{"move_timeout", {
-    //             {"room_id", room_id},
-    //             {"player_id", opponent_id},
-    //         }});
-    //     }
-    // });
 }

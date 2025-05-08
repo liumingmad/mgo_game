@@ -25,11 +25,6 @@ void to_json(nlohmann::json &j, const Room &r)
     to_json(j["board"], r.getConstBoard());
 }
 
-// void from_json(nlohmann::json& j, Room& r) {
-//     r.id = j["id"];
-//     r.state = j["state"];
-// }
-
 bool Room::is_player(std::shared_ptr<Player> p) const
 {
     RoomRole role = getRole(p);
@@ -109,37 +104,12 @@ void Room::setWhitePlayer(std::shared_ptr<Player> p)
     mWhitePlayer = p;
 }
 
-bool Room::addGuest(std::shared_ptr<Player> player)
-{
-    mGuest[player->id] = player;
-    return true;
-}
-
-bool Room::removeGuest(std::shared_ptr<Player> p)
-{
-    mGuest.erase(p->id);
-    return true;
-}
-
 RoomRole Room::getRole(std::shared_ptr<Player> p) const
 {
     if (p->id == mBlackPlayer->id) return RoomRole::BLACK_PLAYER;
     if (p->id == mWhitePlayer->id) return RoomRole::WHITE_PLAYER;
     if (mGuest.find(p->id) != mGuest.end()) return RoomRole::GUEST;
     return RoomRole::UNKNOW;
-}
-
-void onMoveTimeout() {
-    std::cout << "invalid game" << std::endl; 
-    // 1. push message: invalid game
-    // ServerPusher::getInstance().server_push(fd, PushMessage{"move_timeout", {
-    //     {"room_id", room_id},
-    //     {"player_id", player_id},
-    // }});
-
-    // // 2. set room state
-    // std::shared_ptr<Room> room = g_rooms[room_id];
-    // room->switchRoomState(Room::ROOM_STATE_GAME_OVER);
 }
 
 void Room::createGoClock(InitClockTime time)
@@ -192,32 +162,111 @@ void Room::start()
     mGoClock->start();
 }
 
+void Room::pushMessageToAll(std::shared_ptr<PushMessage> pmsg) const {
+    ServerPusher::getInstance().server_push(getBlackPlayer()->id, pmsg); 
+    ServerPusher::getInstance().server_push(getWhitePlayer()->id, pmsg); 
+
+    const std::map<std::string, std::shared_ptr<Player>>& map = getGuests();
+    for (const auto& [uid, value] : map) {
+        ServerPusher::getInstance().server_push(uid, pmsg);
+    }
+}
+
+
+bool Room::addGuest(std::shared_ptr<Player> player)
+{
+    mGuest[player->id] = player;
+    return true;
+}
+
+bool Room::removeGuest(std::shared_ptr<Player> p)
+{
+    mGuest.erase(p->id);
+    return true;
+}
+
+void onMoveTimeout() {
+    std::cout << "invalid game" << std::endl; 
+    // 1. push message: invalid game
+    // ServerPusher::getInstance().server_push(fd, PushMessage{"move_timeout", {
+    //     {"room_id", room_id},
+    //     {"player_id", player_id},
+    // }});
+
+    // // 2. set room state
+    // std::shared_ptr<Room> room = g_rooms[room_id];
+    // room->switchRoomState(Room::ROOM_STATE_GAME_OVER);
+}
+
+void Room::pushStartGame() {
+    // 给两个人分别推送一条消息, 客户端之间跳转到room page开始下棋
+    // StartGameBody body(*this);
+    // ServerPusher &pusher = ServerPusher::getInstance();
+    // pusher.server_push(mBlackPlayer->fd, PushMessage{"start_game", body});
+    // pusher.server_push(it->second->fd, PushMessage{"start_game", body});
+}
+
+void Room::pushMove() {
+    // 获取最新的一步棋
+
+    // 推送落子到room内所有人
+    // PushMessage{"move", {
+    //     {"room_id", room_id},
+    //     {"player_id", user_id},
+    //     {"stone", stone},
+    //     {"board", room->getBoard()}
+    // }}
+}
+
+// 所有触发room state改变的事件，需要通知room内所有人
+// 0. 匹配对手成功
+// 1. 黑/白棋落子
+// 2. 黑/白方离线
+// 3. guest 进入/离开
+// 4. 申请点目
+// 5. 接受或拒绝点目结果
+// 6. 认输
+
+
 void Room::switchRoomState(int newState)
 {
-    if (newState == Room::ROOM_STATE_INIT)
+    if (mState == Room::ROOM_STATE_INIT)
     {
+        if (newState == Room::ROOM_STATE_WAITTING_BLACK_MOVE) { // 等待第一步棋
+            start();
+        }
     }
-    else if (newState == Room::ROOM_STATE_WAITTING_BLACK_MOVE)
+    else if (mState == Room::ROOM_STATE_WAITTING_BLACK_MOVE)
     {
-        mGoClock->whiteTap();
+        // 黑棋下完，等白棋落子
+        if (newState == Room::ROOM_STATE_WAITTING_WHITE_MOVE) {
+            pushMove();
+            mGoClock->resumeWClock();
+        }
     }
-    else if (newState == Room::ROOM_STATE_WAITTING_WHITE_MOVE)
+    else if (mState == Room::ROOM_STATE_WAITTING_WHITE_MOVE)
     {
-        mGoClock->blackTap();
+        // 白棋下完，等黑棋落子
+        if (newState == Room::ROOM_STATE_WAITTING_WHITE_MOVE) {
+            pushMove();
+            mGoClock->resumeBClock();
+        }
     }
-    else if (newState == Room::ROOM_STATE_BLACK_OFFLINE)
+    else if (mState == Room::ROOM_STATE_BLACK_OFFLINE)
+    {
+        // 离线倒记时
+        mGoClock->stop();
+    }
+    else if (mState == Room::ROOM_STATE_WHITE_OFFLINE)
+    {
+        // 离线倒记时
+        mGoClock->stop();
+    }
+    else if (mState == Room::ROOM_STATE_POINT_COUNTTING)
     {
         mGoClock->stop();
     }
-    else if (newState == Room::ROOM_STATE_WHITE_OFFLINE)
-    {
-        mGoClock->stop();
-    }
-    else if (newState == Room::ROOM_STATE_POINT_COUNTTING)
-    {
-        mGoClock->stop();
-    }
-    else if (newState == Room::ROOM_STATE_GAME_OVER)
+    else if (mState == Room::ROOM_STATE_GAME_OVER)
     {
         mGoClock->stop();
     }

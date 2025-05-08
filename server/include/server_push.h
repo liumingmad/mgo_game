@@ -6,6 +6,7 @@
 #include <atomic>
 #include "push_message.h"
 #include "wrap.h"
+#include "message.h"
 
 
 // 服务器推送的序列号
@@ -31,7 +32,7 @@ public:
     ServerPusher(const ServerPusher& p) = delete;
     ServerPusher& operator=(const ServerPusher& p) = delete;
 
-    int server_push(int fd, PushMessage message);
+    int server_push(std::string uid, std::shared_ptr<PushMessage> message);
 };
 
 int writeResponse(std::shared_ptr<Message> msg, const Response response);

@@ -8,7 +8,7 @@
 
 #include "wrap.h"
 #include "Server.h"
-#include "Handler.h"
+#include "message.h"
 #include "protocol.h"
 #include "Log.h"
 #include "core.h"

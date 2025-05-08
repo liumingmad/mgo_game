@@ -21,9 +21,6 @@ public:
     // online
     bool online;
 
-    // 上线和离线的时间点列表
-    std::queue<long> active_time_list;
-
     
 };
 NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(Player, id, name, level, color)

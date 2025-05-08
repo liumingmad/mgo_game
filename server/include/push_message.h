@@ -7,7 +7,6 @@
 
 #include "json.hpp"
 #include "body.h"
-#include "room.h"
 
 struct PushMessage
 {
@@ -15,13 +14,5 @@ struct PushMessage
     nlohmann::json data;
 };
 NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(PushMessage, action, data)
-
-class StartGameBody
-{
-public:
-    Room room;
-    StartGameBody(Room r):room(r) {}
-};
-NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(StartGameBody, room)
 
 #endif // PUSH_MESSAGE_H

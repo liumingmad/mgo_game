@@ -5,7 +5,7 @@
 #include <string>
 
 #include "Log.h"
-#include "Handler.h"
+#include "message.h"
 #include "body.h"
 
 class RoomCore {

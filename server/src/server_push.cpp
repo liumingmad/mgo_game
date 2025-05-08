@@ -1,14 +1,23 @@
 #include "server_push.h"
 #include <protocol.h>
 #include <wrap.h>
+#include "global.h"
 
 long get_push_serial_number() {
     return g_server_push_serial_number++;
 }
 
-int ServerPusher::server_push(int fd, PushMessage message)
+int ServerPusher::server_push(std::string uid, std::shared_ptr<PushMessage> message)
 {
-    nlohmann::json j = message;
+    auto it = g_uidClientMap.find(uid);
+    if (it == g_uidClientMap.end()) {
+        std::cout << uid << " not found" << std::endl;
+        return 1;
+    }
+
+    int fd = it->second->fd;
+
+    nlohmann::json j = *message;
     std::string json = j.dump();
 
     ProtocolWriter pw;

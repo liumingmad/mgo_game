@@ -12,6 +12,7 @@
 #include "player.h"
 #include "TimerManager.h"
 #include "timer.h"
+#include "push_message.h"
 
 
 struct InitClockTime
@@ -141,14 +142,14 @@ public:
         mRunning.store(false, std::memory_order_release);
     }
 
-    void blackTap()
-    {
-        mWaitingBlackMove.store(false, std::memory_order_release);
-    }
-
-    void whiteTap()
+    void resumeBClock()
     {
         mWaitingBlackMove.store(true, std::memory_order_release);
+    }
+
+    void resumeWClock()
+    {
+        mWaitingBlackMove.store(false, std::memory_order_release);
     }
 };
 
@@ -192,6 +193,10 @@ public:
 
 
     void start();
+
+    void pushMessageToAll(std::shared_ptr<PushMessage> pmsg) const;
+    void pushStartGame();
+    void pushMove();
 
     // 当执行queue中Message的过程中，不能执行队列中下一个
     std::mutex mutex;
