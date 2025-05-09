@@ -215,7 +215,7 @@ public:
 
     void pushMessageToAll(std::shared_ptr<PushMessage> pmsg) const;
     void pushStartGame();
-    void pushMove();
+    void pushMove(const Stone& stone);
 
     // 当执行queue中Message的过程中，不能执行队列中下一个
     std::mutex mutex;

@@ -167,10 +167,7 @@ void Room::pushStartGame() {
     pushMessageToAll(pmsg);
 }
 
-void Room::pushMove() {
-    // 获取最新的一步棋
-    const Stone& stone = mBoard.getCurrentNode()->getStone();
-
+void Room::pushMove(const Stone& stone) {
     std::string player_id;
     if (stone.color == 'B') {
         player_id = mBlackPlayer->id;
@@ -202,50 +199,6 @@ void Room::pushMove() {
 
 void Room::switchRoomState(int newState)
 {
-    Log::info("switchRoomState oldState=" + mState);
-    Log::info("switchRoomState newState=" + newState);
-    if (mState == Room::ROOM_STATE_INIT)
-    {
-        if (newState == Room::ROOM_STATE_WAITTING_BLACK_MOVE) { // 等待第一步棋
-            pushStartGame();
-            mGoClock->start();
-        }
-    }
-    else if (mState == Room::ROOM_STATE_WAITTING_BLACK_MOVE)
-    {
-        // 黑棋下完，等白棋落子
-        if (newState == Room::ROOM_STATE_WAITTING_WHITE_MOVE) {
-            pushMove();
-            mGoClock->resumeWClock();
-        }
-    }
-    else if (mState == Room::ROOM_STATE_WAITTING_WHITE_MOVE)
-    {
-        // 白棋下完，等黑棋落子
-        if (newState == Room::ROOM_STATE_WAITTING_WHITE_MOVE) {
-            pushMove();
-            mGoClock->resumeBClock();
-        }
-    }
-    else if (mState == Room::ROOM_STATE_BLACK_OFFLINE)
-    {
-        // 离线倒记时
-        mGoClock->stop();
-    }
-    else if (mState == Room::ROOM_STATE_WHITE_OFFLINE)
-    {
-        // 离线倒记时
-        mGoClock->stop();
-    }
-    else if (mState == Room::ROOM_STATE_POINT_COUNTTING)
-    {
-        mGoClock->stop();
-    }
-    else if (mState == Room::ROOM_STATE_GAME_OVER)
-    {
-        mGoClock->stop();
-    }
-
     mState = newState;
 }
 

@@ -68,7 +68,6 @@ int RoomCore::run(std::shared_ptr<RoomMessage> roomMessage) {
 
 void RoomCore::do_clock_tick(std::shared_ptr<RoomMessage> msg) {
     auto sharedRoom = room.lock();
-    std::cout << sharedRoom << std::endl;
     assert(sharedRoom);
 
     std::shared_ptr<GoClock> goClock = std::any_cast<std::shared_ptr<GoClock>>(msg->data);
@@ -338,9 +337,13 @@ void RoomCore::do_waitting_move(std::shared_ptr<Message> msg) {
     // 6. 回复客户端200
     writeResponse(msg, Response{200, "move success", {}});
 
+    room->pushMove(stone);
+
     if (is_waitting_black) {
+        room->getGoClock()->resumeWClock();
         room->switchRoomState(Room::ROOM_STATE_WAITTING_WHITE_MOVE);
     } else {
+        room->getGoClock()->resumeBClock();
         room->switchRoomState(Room::ROOM_STATE_WAITTING_BLACK_MOVE);
     }
 
