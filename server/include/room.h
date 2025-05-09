@@ -114,21 +114,23 @@ public:
 
     void countdown()
     {
+        std::cout << "countdown" << std::endl;
         TimerManager::instance().addTask(Timer::TIME_TASK_ID_COUNTDOWN, 1000, [&]()
-                                            {
-        if (!mRunning.load(std::memory_order_acquire)) return;
+        {
+            if (!mRunning.load(std::memory_order_acquire)) return;
 
-        if (mWaitingBlackMove.load(std::memory_order_acquire)) {
-            mBClock->subOne();
-        } else {
-            mWClock->subOne();
-        }
+            if (mWaitingBlackMove.load(std::memory_order_acquire)) {
+                mBClock->subOne();
+            } else {
+                mWClock->subOne();
+            }
 
-        if (mCallback) {
-            mCallback(1);
-        }
+            if (mCallback) {
+                mCallback(1);
+            }
 
-        countdown(); });
+            countdown(); 
+        });
     }
 
     void start()
@@ -177,6 +179,7 @@ private:
 
 public:
     std::string getId() const;
+    std::shared_ptr<GoClock> getGoClock();
     int getState() const;
     std::map<std::string, std::shared_ptr<Player>> getGuests() const;
     Board &getBoard();

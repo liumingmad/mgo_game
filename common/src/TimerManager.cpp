@@ -25,7 +25,8 @@ void TimerManager::init(int epollFd_) {
 }
 
 void TimerManager::addTask(int id, uint64_t delayMs, function<void()> cb) {
-    lock_guard<mutex> lock(mtx);
+    std::cout << "addTask " << id << std::endl; 
+    lock_guard<mutex> lock(recursive_mutex);
     uint64_t expireTime = nowMs() + delayMs;
     tasks.push(TimerTask{id, expireTime, cb});
     taskMap[id] = expireTime;
@@ -33,7 +34,7 @@ void TimerManager::addTask(int id, uint64_t delayMs, function<void()> cb) {
 }
 
 void TimerManager::removeTask(int id) {
-    lock_guard<mutex> lock(mtx);
+    lock_guard<mutex> lock(recursive_mutex);
     taskMap.erase(id);
     resetTimer();
 }
@@ -42,15 +43,15 @@ void TimerManager::handleTimerEvent() {
     uint64_t exp;
     read(timerFd, &exp, sizeof(exp));
 
-    lock_guard<mutex> lock(mtx);
+    lock_guard<mutex> lock(recursive_mutex);
     uint64_t currentTime = nowMs();
     while (!tasks.empty()) {
         auto task = tasks.top();
         if (task.expire > currentTime) break;
         tasks.pop();
         if (taskMap.count(task.id) && taskMap[task.id] == task.expire) {
-            task.callback();
             taskMap.erase(task.id);
+            task.callback();
         }
     }
     resetTimer();

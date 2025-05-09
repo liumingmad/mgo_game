@@ -8,10 +8,14 @@
 #include "json.hpp"
 #include "body.h"
 
-struct PushMessage
+class PushMessage
 {
+public:
     std::string action;
     nlohmann::json data;
+    PushMessage(std::string action, nlohmann::json data)
+    : action(action), data(data) {
+    }
 };
 NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(PushMessage, action, data)
 

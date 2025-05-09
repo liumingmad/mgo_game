@@ -40,5 +40,5 @@ private:
     int epollFd;
     priority_queue<TimerTask, vector<TimerTask>, greater<>> tasks;
     unordered_map<int, uint64_t> taskMap;
-    mutex mtx;
+    recursive_mutex mtx;
 };

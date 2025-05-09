@@ -51,7 +51,7 @@ int Server::init() {
     m_event_handler.init();
 
     // 定时器
-    // m_timer.start();
+    m_timer.start();
 
     return 0;
 }
@@ -142,6 +142,8 @@ std::shared_ptr<Request> parseRequest(const std::string& jsonStr) {
 }
 
 int Server::handle_request(std::shared_ptr<Client> client) {
+    Log::info("\n\n-----------START-----------------");
+
     char buf[BUF_SIZE];
     bzero(buf, BUF_SIZE);
     int n = Read(client->fd, buf, BUF_SIZE);
@@ -182,6 +184,7 @@ int Server::handle_request(std::shared_ptr<Client> client) {
 
     m_pool.submit([this, client]() {
         this->handle_message(client);
+        Log::info("\n\n-----------END-----------------");
     });
 
     // 清理无效数据

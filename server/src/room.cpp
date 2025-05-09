@@ -1,8 +1,10 @@
 #include "room.h"
 #include <TimerManager.h>
 #include <timer.h>
-#include <server_push.h>
+#include "server_push.h"
 #include "player.h"
+#include "start_game_body.h"
+#include "common_utils.h"
 
 void to_json(nlohmann::json &j, const Room &r)
 {
@@ -112,15 +114,21 @@ RoomRole Room::getRole(std::shared_ptr<Player> p) const
     return RoomRole::UNKNOW;
 }
 
+std::shared_ptr<GoClock> Room::getGoClock() {
+    return mGoClock;
+}
+
 void Room::createGoClock(InitClockTime time)
 {
     mGoClock = std::make_shared<GoClock>(time);
     mGoClock->setCallback([](int val) {
-        // 倒计时回调
+        // 回调在线程内执行，记得加锁mutex, 只读吗？
+
+        // 校准倒计时
         // 1. 要给room内所有人push一个时间
         // 2. 通过val检查超时
         // onMoveTimeout
-        std::cout << "GoClock Callback called!" << std::endl;
+        std::cout << "GoClock Callback called!" << get_now_milliseconds() << std::endl;
     });
 }
 
@@ -172,7 +180,6 @@ void Room::pushMessageToAll(std::shared_ptr<PushMessage> pmsg) const {
     }
 }
 
-
 bool Room::addGuest(std::shared_ptr<Player> player)
 {
     mGuest[player->id] = player;
@@ -194,28 +201,37 @@ void onMoveTimeout() {
     // }});
 
     // // 2. set room state
-    // std::shared_ptr<Room> room = g_rooms[room_id];
     // room->switchRoomState(Room::ROOM_STATE_GAME_OVER);
 }
 
+// 给两个人分别推送一条消息, 客户端之间跳转到room page开始下棋
 void Room::pushStartGame() {
-    // 给两个人分别推送一条消息, 客户端之间跳转到room page开始下棋
-    // StartGameBody body(*this);
-    // ServerPusher &pusher = ServerPusher::getInstance();
-    // pusher.server_push(mBlackPlayer->fd, PushMessage{"start_game", body});
-    // pusher.server_push(it->second->fd, PushMessage{"start_game", body});
+    StartGameBody body(*this);
+    std::shared_ptr<PushMessage> pmsg = std::make_shared<PushMessage>("start_game", body);
+    pushMessageToAll(pmsg);
 }
 
 void Room::pushMove() {
     // 获取最新的一步棋
+    const Stone& stone = mBoard.getCurrentNode()->getStone();
+
+    std::string player_id;
+    if (stone.color == 'B') {
+        player_id = mBlackPlayer->id;
+    } else if (stone.color == 'W') {
+        player_id = mWhitePlayer->id;
+    }
+
+    nlohmann::json j = {
+        {"room_id", getId()},
+        {"player_id", player_id},
+        {"stone", stone},
+        {"board", getBoard()}
+    };
 
     // 推送落子到room内所有人
-    // PushMessage{"move", {
-    //     {"room_id", room_id},
-    //     {"player_id", user_id},
-    //     {"stone", stone},
-    //     {"board", room->getBoard()}
-    // }}
+    std::shared_ptr<PushMessage> pmsg = std::make_shared<PushMessage>("move", j);
+    pushMessageToAll(pmsg);
 }
 
 // 所有触发room state改变的事件，需要通知room内所有人
@@ -230,10 +246,13 @@ void Room::pushMove() {
 
 void Room::switchRoomState(int newState)
 {
+    Log::info("switchRoomState oldState=" + mState);
+    Log::info("switchRoomState newState=" + newState);
     if (mState == Room::ROOM_STATE_INIT)
     {
         if (newState == Room::ROOM_STATE_WAITTING_BLACK_MOVE) { // 等待第一步棋
-            start();
+            pushStartGame();
+            mGoClock->start();
         }
     }
     else if (mState == Room::ROOM_STATE_WAITTING_BLACK_MOVE)

@@ -19,7 +19,7 @@ class Node
         std::shared_ptr<BitArray2D> data;
         Node(int x, int y, char player, int w, int h);
         ~Node();
-        Stone& getStone() const;
+        const Stone& getStone() const;
         std::shared_ptr<Node> getParent();
         void setParent(std::shared_ptr<Node> node);
         std::vector<std::shared_ptr<Node>> getChildren() const;

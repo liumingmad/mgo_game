@@ -36,12 +36,12 @@ void EventHandler::init() {
     AsyncEventBus& bus = AsyncEventBus::getInstance();
     bus.subscribe<std::string>(EventHandler::EVENT_ONLINE, onEventOnline);
     bus.subscribe<std::string>(EventHandler::EVENT_OFFLINE, onEventOffline);
-    bus.subscribe<std::string>(EventHandler::EVENT_MOVE, onEventTMP);
-    bus.subscribe<std::string>(EventHandler::EVENT_DEFEAT, onEventTMP);
-    bus.subscribe<std::string>(EventHandler::EVENT_GUEST_ENTER_ROOM, onEventTMP);
-    bus.subscribe<std::string>(EventHandler::EVENT_GUEST_LEAVE_ROOM, onEventTMP);
-    bus.subscribe<std::string>(EventHandler::EVENT_CHAT, onEventTMP);
-    bus.subscribe<std::string>(EventHandler::EVENT_HEART_DISMISS, onEventTMP);
-    bus.subscribe<std::string>(EventHandler::EVENT_MOVE_TIMEOUT, onEventTMP);
-    bus.subscribe<std::string>(EventHandler::EVENT_OFFLINE_TIMEOUT, onEventTMP);
+    // bus.subscribe<std::string>(EventHandler::EVENT_MOVE, onEventTMP);
+    // bus.subscribe<std::string>(EventHandler::EVENT_DEFEAT, onEventTMP);
+    // bus.subscribe<std::string>(EventHandler::EVENT_GUEST_ENTER_ROOM, onEventTMP);
+    // bus.subscribe<std::string>(EventHandler::EVENT_GUEST_LEAVE_ROOM, onEventTMP);
+    // bus.subscribe<std::string>(EventHandler::EVENT_CHAT, onEventTMP);
+    // bus.subscribe<std::string>(EventHandler::EVENT_HEART_DISMISS, onEventTMP);
+    // bus.subscribe<std::string>(EventHandler::EVENT_MOVE_TIMEOUT, onEventTMP);
+    // bus.subscribe<std::string>(EventHandler::EVENT_OFFLINE_TIMEOUT, onEventTMP);
 }

@@ -22,7 +22,7 @@ Node::Node(int x, int y, char player, int boardWidth, int boardHeight) {
 Node::~Node() {
 }
 
-Stone& Node::getStone() const {
+const Stone& Node::getStone() const {
     return *(this->stone);
 }
 

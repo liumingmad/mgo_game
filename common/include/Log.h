@@ -9,8 +9,8 @@ private:
     Log();
     ~Log();
 public:
-    static void info(const char* message);
-    static void error(const char* message);
+    static void info(std::string message);
+    static void error(std::string message);
 };
 
 #endif // LOG_H
