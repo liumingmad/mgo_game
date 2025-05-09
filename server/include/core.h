@@ -19,7 +19,6 @@ public:
 
     // 基于应答的状态机
     int run(std::shared_ptr<Message> msg);
-    void handle_room_request(std::shared_ptr<Message> msg);
 
     void on_auth_success(const int fd, const std::string token);
     void do_sign_in(std::shared_ptr<Message> msg);

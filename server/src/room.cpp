@@ -5,6 +5,7 @@
 #include "player.h"
 #include "start_game_body.h"
 #include "common_utils.h"
+#include <global.h>
 
 void to_json(nlohmann::json &j, const Room &r)
 {
@@ -118,17 +119,16 @@ std::shared_ptr<GoClock> Room::getGoClock() {
     return mGoClock;
 }
 
+
+
 void Room::createGoClock(InitClockTime time)
 {
     mGoClock = std::make_shared<GoClock>(time);
-    mGoClock->setCallback([](int val) {
-        // 回调在线程内执行，记得加锁mutex, 只读吗？
-
-        // 校准倒计时
-        // 1. 要给room内所有人push一个时间
-        // 2. 通过val检查超时
-        // onMoveTimeout
-        std::cout << "GoClock Callback called!" << get_now_milliseconds() << std::endl;
+    mGoClock->setCallback([&]() {
+        std::shared_ptr<RoomMessage> rmsg = std::make_shared<RoomMessage>();
+        rmsg->action = "clock_tick";
+        rmsg->data = mGoClock;
+        postRoomMessage(rmsg);
     });
 }
 
@@ -136,6 +136,7 @@ Room::Room(std::string id)
     : mId(id),
       core(std::make_shared<RoomCore>())
 {
+    core->room = shared_from_this();
 }
 
 Room::~Room() {}
@@ -192,17 +193,6 @@ bool Room::removeGuest(std::shared_ptr<Player> p)
     return true;
 }
 
-void onMoveTimeout() {
-    std::cout << "invalid game" << std::endl; 
-    // 1. push message: invalid game
-    // ServerPusher::getInstance().server_push(fd, PushMessage{"move_timeout", {
-    //     {"room_id", room_id},
-    //     {"player_id", player_id},
-    // }});
-
-    // // 2. set room state
-    // room->switchRoomState(Room::ROOM_STATE_GAME_OVER);
-}
 
 // 给两个人分别推送一条消息, 客户端之间跳转到room page开始下棋
 void Room::pushStartGame() {
@@ -296,4 +286,21 @@ void Room::switchRoomState(int newState)
 void Room::switchPointCountingState(u_int8_t new_state)
 {
     mPointCountingState = new_state;
+}
+
+void Room::handleRoomMessage(std::shared_ptr<RoomMessage> msg) {
+}
+
+void Room::postRoomMessage(std::shared_ptr<RoomMessage> msg) {
+    queue.enqueue(msg);
+    g_room_pool.submit([&]() {
+        // 加锁的原因是，不想让多个线程同时处理一个room的消息
+        std::unique_lock<std::mutex> lock(mutex);
+        while (!queue.empty()) {
+            std::shared_ptr<RoomMessage> msg;
+            if (queue.dequeue(msg)) {
+                core->run(msg);
+            }
+        }
+    });
 }

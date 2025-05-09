@@ -14,18 +14,18 @@
 #include "timer.h"
 #include "push_message.h"
 
-
 struct InitClockTime
 {
     int preTime;
     int readSecondCount;
     int moveTime;
 };
+NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(InitClockTime, preTime, readSecondCount, moveTime)
 
 class RClock
 {
-private:
-    const InitClockTime Init_Time;
+public:
+    InitClockTime mInitTime;
 
     // 保留时间
     int mPreTime;
@@ -36,12 +36,11 @@ private:
     // 每步棋的的剩余时间
     int mMoveTime;
 
-public:
     RClock(InitClockTime time)
-        : Init_Time(time),
-            mPreTime(time.preTime),
-            mReadSecondCount(time.readSecondCount),
-            mMoveTime(time.moveTime)
+        : mInitTime(time),
+          mPreTime(time.preTime),
+          mReadSecondCount(time.readSecondCount),
+          mMoveTime(time.moveTime)
     {
     }
 
@@ -49,8 +48,8 @@ public:
     {
     }
 
-    RClock(RClock &one) = delete;
-    RClock &operator=(const RClock &one) = delete;
+    RClock(RClock &one) = default;
+    RClock &operator=(const RClock &one) = default;
     RClock(RClock &&) = default;
     RClock &operator=(RClock &&) = default;
 
@@ -69,67 +68,78 @@ public:
         return mMoveTime;
     }
 
-    // 减1，如果没时间了，则返回false，否则返回true
+    // 减1，超时return true
     bool subOne()
     {
         if (mPreTime > 0)
         {
             mPreTime--;
-        }
-
-        if (mMoveTime == 0)
-        {
-            mReadSecondCount--;
-            mMoveTime = Init_Time.moveTime;
-        }
-
-        if (mReadSecondCount == 0)
-        {
             return false;
         }
-        return true;
+
+        if (mMoveTime > 0)
+        {
+            mMoveTime--;
+            return false;
+        }
+
+        mReadSecondCount--;
+        mMoveTime = mInitTime.moveTime;
+
+        return mReadSecondCount > 0 ? false : true;
     }
 };
+NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(RClock, mInitTime, mPreTime, mReadSecondCount, mMoveTime)
 
 class GoClock
 {
 private:
     std::atomic<bool> mRunning = false;
-    std::atomic<bool> mWaitingBlackMove = true;
+    std::atomic<bool> mBClockWorking = true;
+    std::string mRoomId;
     std::shared_ptr<RClock> mBClock;
     std::shared_ptr<RClock> mWClock;
-    std::function<void(int)> mCallback;
+    std::function<void()> mCallback;
 
 public:
+    std::shared_ptr<RClock> getBClock() { return mBClock; }
+    std::shared_ptr<RClock> getWClock() { return mWClock; }
+
     GoClock(InitClockTime time) : mBClock(std::make_shared<RClock>(time)),
-                                    mWClock(std::make_shared<RClock>(time))
+                                  mWClock(std::make_shared<RClock>(time))
     {
     }
     ~GoClock() {}
 
-    void setCallback(std::function<void(int)> cb)
+    GoClock(GoClock &one) = default;
+    GoClock &operator=(const GoClock &one) = default;
+    GoClock(GoClock &&) = default;
+    GoClock &operator=(GoClock &&) = default;
+
+    void setCallback(std::function<void()> cb)
     {
         mCallback = cb;
     }
 
     void countdown()
     {
-        std::cout << "countdown" << std::endl;
-        TimerManager::instance().addTask(Timer::TIME_TASK_ID_COUNTDOWN, 1000, [&]()
-        {
+        // std::shared_ptr<GoClock> goClock = std::make_shared<GoClock>(mBClock, mWClock);
+        TimerManager::instance().addTask(mRoomId, 1000, [&]()
+                                         {
             if (!mRunning.load(std::memory_order_acquire)) return;
 
-            if (mWaitingBlackMove.load(std::memory_order_acquire)) {
+            if (mBClockWorking.load(std::memory_order_acquire)) {
                 mBClock->subOne();
             } else {
                 mWClock->subOne();
             }
 
             if (mCallback) {
-                mCallback(1);
+                mCallback();
             }
 
-            countdown(); 
+            countdown();
+            
         });
     }
 
@@ -141,17 +151,18 @@ public:
 
     void stop()
     {
+        TimerManager::instance().removeTask(mRoomId);
         mRunning.store(false, std::memory_order_release);
     }
 
     void resumeBClock()
     {
-        mWaitingBlackMove.store(true, std::memory_order_release);
+        mBClockWorking.store(true, std::memory_order_release);
     }
 
     void resumeWClock()
     {
-        mWaitingBlackMove.store(false, std::memory_order_release);
+        mBClockWorking.store(false, std::memory_order_release);
     }
 };
 
@@ -163,7 +174,7 @@ enum RoomRole
     UNKNOW
 };
 
-class Room
+class Room : public std::enable_shared_from_this<Room>
 {
 private:
     int mState = ROOM_STATE_INIT;
@@ -194,7 +205,6 @@ public:
     bool removeGuest(std::shared_ptr<Player>);
     RoomRole getRole(std::shared_ptr<Player>) const;
 
-
     void start();
 
     void pushMessageToAll(std::shared_ptr<PushMessage> pmsg) const;
@@ -203,8 +213,11 @@ public:
 
     // 当执行queue中Message的过程中，不能执行队列中下一个
     std::mutex mutex;
-    SafeQueue<std::shared_ptr<Message>> queue;
+    SafeQueue<std::shared_ptr<RoomMessage>> queue;
     std::shared_ptr<RoomCore> core;
+
+    void postRoomMessage(std::shared_ptr<RoomMessage> msg);
+    void handleRoomMessage(std::shared_ptr<RoomMessage> msg);
 
     // 数目的状态
     // 每个人有三种状态：argee/reject/selecting

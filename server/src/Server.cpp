@@ -203,7 +203,7 @@ void Server::handle_message(std::shared_ptr<Client> client) {
         if (queue.dequeue(msg)) {
             if (msg->header->command == ProtocolHeader::HEADER_COMMAND_HEART) {
                 int fd = msg->fd;
-                TimerManager::instance().addTask(Timer::TIME_TASK_ID_HEARTBEAT, 30000, [this, fd](){
+                TimerManager::instance().addTask(TIME_TASK_ID_HEARTBEAT, 30000, [this, fd](){
                     this->heart_timeout(fd);
                 });
                 std::cout << msg->fd << ": HEADER_COMMAND_HEART" << std::endl;

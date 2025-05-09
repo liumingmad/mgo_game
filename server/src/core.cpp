@@ -130,6 +130,18 @@ void Core::do_match_player(std::shared_ptr<Message> msg)
     {
         writeResponse(msg, Response{200, "success, please waitting 30s", MatchPlayerResponse{AUTO_MATCH_DURATION}});
 
+        if (true) {
+            std::shared_ptr<Room> room = create_room(m_user_id);
+            g_rooms[room->getId()] = room;
+            InitClockTime time;
+            time.preTime = 300;
+            time.readSecondCount = 3;
+            time.moveTime = 30;
+            room->createGoClock(time);
+            room->getGoClock()->start();
+            return;
+        }
+
         // 0. 从缓存中找自己的Player
         std::shared_ptr<Player> self = g_players[m_user_id];
 
@@ -183,8 +195,6 @@ void Core::do_match_player(std::shared_ptr<Message> msg)
 
 int Core::run(std::shared_ptr<Message> msg)
 {
-    Log::info("\n\n----------------------------");
-
     std::string user_id;
     if (msg->request->token.length() == 0)
     {
@@ -241,56 +251,24 @@ int Core::run(std::shared_ptr<Message> msg)
 
 
     // 同一个room内的操作，单线程处理
-    else if (msg->request->action == "enter_room")
+    else if (msg->request->action == "enter_room"
+        || msg->request->action == "exit_room"
+        || msg->request->action == "get_room_info"
+        || msg->request->action == "move"
+        || msg->request->action == "point_counting"
+        || msg->request->action == "update_point_result"
+        || msg->request->action == "gave_up"
+    )
     {
-        handle_room_request(msg);
+        std::string room_id = msg->request->data["room_id"].get<std::string>();
+        std::shared_ptr<Room> room = g_rooms[room_id];
+
+        std::shared_ptr<RoomMessage> rmsg = std::make_shared<RoomMessage>();
+        rmsg->reqMsg = msg;
+        room->postRoomMessage(rmsg);
     }
-    else if (msg->request->action == "exit_room")
-    {
-        handle_room_request(msg);
-    }
-    else if (msg->request->action == "get_room_info")
-    {
-        handle_room_request(msg);
-    } 
-    else if (msg->request->action == "move") 
-    {
-        handle_room_request(msg);
-    }
-    else if (msg->request->action == "point_counting")  // 申请点目
-    {
-        handle_room_request(msg);
-    }
-    else if (msg->request->action == "update_point_result") // 确认点目结果
-    {
-        handle_room_request(msg);
-    }
-    else if (msg->request->action == "gave_up")  // 认输
-    {
-        handle_room_request(msg);
-    }
+
     return 0;
 }
-void handle_room_message(std::shared_ptr<Room> room) {
-    // 加锁的原因是，不想让多个线程同时处理一个连接的消息
-    std::unique_lock<std::mutex> lock(room->mutex);
 
-    SafeQueue<std::shared_ptr<Message>>& queue = room->queue;
-    while (!queue.empty()) {
-        std::shared_ptr<Message> msg;
-        if (queue.dequeue(msg)) {
-            room->core->run(msg);
-        }
-    }
-}
-
-void Core::handle_room_request(std::shared_ptr<Message> msg) {
-    std::string room_id = msg->request->data["room_id"].get<std::string>();
-    std::shared_ptr<Room> room = g_rooms[room_id];
-    room->queue.enqueue(msg);
-
-    g_room_pool.submit([room]() {
-        handle_room_message(room);
-    });
-}
 

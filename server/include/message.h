@@ -15,4 +15,11 @@ public:
     std::shared_ptr<Request> request;
 };
 
+class RoomMessage {
+public:
+    std::shared_ptr<Message> reqMsg;
+    std::string action;
+    std::any data;
+};
+
 #endif // HANDLE_H

@@ -24,8 +24,7 @@ void TimerManager::init(int epollFd_) {
     epoll_ctl(epollFd, EPOLL_CTL_ADD, timerFd, &ev);
 }
 
-void TimerManager::addTask(int id, uint64_t delayMs, function<void()> cb) {
-    std::cout << "addTask " << id << std::endl; 
+void TimerManager::addTask(std::string id, uint64_t delayMs, function<void()> cb) {
     lock_guard<mutex> lock(recursive_mutex);
     uint64_t expireTime = nowMs() + delayMs;
     tasks.push(TimerTask{id, expireTime, cb});
@@ -33,7 +32,7 @@ void TimerManager::addTask(int id, uint64_t delayMs, function<void()> cb) {
     resetTimer();
 }
 
-void TimerManager::removeTask(int id) {
+void TimerManager::removeTask(std::string id) {
     lock_guard<mutex> lock(recursive_mutex);
     taskMap.erase(id);
     resetTimer();

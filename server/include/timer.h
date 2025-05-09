@@ -10,6 +10,8 @@
 
 #include "TimerManager.h"
 
+static const std::string TIME_TASK_ID_HEARTBEAT = "TIME_TASK_ID_HEARTBEAT"; 
+
 class Timer
 {
 private:
@@ -17,9 +19,6 @@ private:
     std::atomic<bool> m_running{true};
 
 public:
-    static const int TIME_TASK_ID_HEARTBEAT = 1; 
-    static const int TIME_TASK_ID_WAITTING_MOVE = 2; 
-    static const int TIME_TASK_ID_COUNTDOWN = 3;
 
     Timer()
     {

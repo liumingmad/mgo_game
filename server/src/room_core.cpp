@@ -17,35 +17,67 @@
 #include "player.h"
 
 
-int RoomCore::run(std::shared_ptr<Message> msg) {
-    if (msg->request->action == "enter_room")
+int RoomCore::run(std::shared_ptr<RoomMessage> roomMsg) {
+    std::shared_ptr<Message> msg = roomMsg->reqMsg; 
+    std::string action = msg->request->action;
+
+    if (action == "enter_room")
     {
         do_enter_room(msg);
     }
-    else if (msg->request->action == "exit_room")
+    else if (action == "exit_room")
     {
         do_exit_room(msg);
     }
-    else if (msg->request->action == "get_room_info")
+    else if (action == "get_room_info")
     {
         do_get_room_info(msg);
     } 
-    else if (msg->request->action == "move") 
+    else if (action == "move") 
     {
         do_waitting_move(msg);
     }
-    else if (msg->request->action == "point_counting")  // 申请点目
+    else if (action == "point_counting")  // 申请点目
     {
         do_point_counting(msg);
     }
-    else if (msg->request->action == "update_point_result") // 确认点目结果
+    else if (action == "update_point_result") // 确认点目结果
     {
         do_point_counting_result(msg);
     }
-    else if (msg->request->action == "gave_up")  // 认输
+    else if (action == "gave_up")  // 认输
     {
         do_gave_up(msg);
     }
+    else if (action == "clock_tick")  // 时钟滴答
+    {
+        do_clock_tick(roomMsg);
+    }
+}
+
+void RoomCore::do_clock_tick(std::shared_ptr<RoomMessage> msg) {
+    auto sharedRoom = room.lock();
+    assert(sharedRoom);
+
+    std::shared_ptr<GoClock> goClock = std::any_cast<std::shared_ptr<GoClock>>(msg->data);
+    std::shared_ptr<RClock> bc = goClock->getBClock();
+    std::shared_ptr<RClock> wc = goClock->getWClock();
+
+    // push
+    nlohmann::json j = {
+        {"room_id", sharedRoom->getId()},
+        {"bclock", *bc},
+        {"wclock", *wc},
+    };
+    std::shared_ptr<PushMessage> pmsg = std::make_shared<PushMessage>("move_timeout", j);
+    sharedRoom->pushMessageToAll(pmsg);
+
+    // timeout
+    bool blackTimeout = bc->getReadSecondCount() <= 0;
+    bool whiteTimeout = wc->getReadSecondCount() <= 0;
+    if (blackTimeout || whiteTimeout) {
+        sharedRoom->switchRoomState(Room::ROOM_STATE_GAME_OVER); 
+    } 
 }
 
 void RoomCore::do_enter_room(std::shared_ptr<Message> msg)
@@ -215,7 +247,7 @@ void RoomCore::do_point_counting(std::shared_ptr<Message> msg) {
     }
 
     // 暂停计时器
-    TimerManager::instance().removeTask(Timer::TIME_TASK_ID_WAITTING_MOVE);
+    // TimerManager::instance().removeTask(Timer::TIME_TASK_ID_WAITTING_MOVE);
 
     // switch state
     room->switchRoomState(Room::ROOM_STATE_POINT_COUNTTING);

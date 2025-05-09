@@ -13,7 +13,7 @@ using Clock = chrono::steady_clock;
 using Milliseconds = chrono::milliseconds;
 
 struct TimerTask {
-    int id;
+    string id;
     uint64_t expire;
     function<void()> callback;
     bool operator>(const TimerTask& other) const {
@@ -25,8 +25,8 @@ class TimerManager {
 public:
     static TimerManager& instance();
     void init(int epollFd);
-    void addTask(int id, uint64_t delayMs, function<void()> cb);
-    void removeTask(int id);
+    void addTask(string id, uint64_t delayMs, function<void()> cb);
+    void removeTask(string id);
     void handleTimerEvent();
     int getTimerFd();
 
@@ -39,6 +39,6 @@ private:
     int timerFd;
     int epollFd;
     priority_queue<TimerTask, vector<TimerTask>, greater<>> tasks;
-    unordered_map<int, uint64_t> taskMap;
+    unordered_map<std::string, uint64_t> taskMap;
     recursive_mutex mtx;
 };
