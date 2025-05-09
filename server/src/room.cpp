@@ -132,40 +132,6 @@ void Room::createGoClock(InitClockTime time)
     });
 }
 
-Room::Room(std::string id)
-    : mId(id),
-      core(std::make_shared<RoomCore>())
-{
-    core->room = shared_from_this();
-}
-
-Room::~Room() {}
-
-void Room::clone(const Room &other)
-{
-    this->mId = other.mId;
-    this->mBlackPlayer = other.mBlackPlayer;
-    this->mWhitePlayer = other.mWhitePlayer;
-    this->mGuest = other.mGuest;
-    this->mState = other.mState;
-    this->mBoard = other.mBoard;
-    this->mScore = other.mScore;
-}
-
-Room::Room(const Room &one)
-{
-    clone(one);
-}
-
-Room &Room::operator=(const Room &one)
-{
-    if (this == &one)
-        return *this;
-
-    clone(one);
-    return *this;
-}
-
 void Room::start()
 {
     mGoClock->start();

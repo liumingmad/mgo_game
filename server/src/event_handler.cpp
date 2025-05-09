@@ -5,7 +5,7 @@ void onEventTMP(const std::string move) {
 }
 
 void onEventOnline(const std::string user_id) {
-    std::cout << "onEventOnline() "  << user_id << std::endl;
+    // std::cout << "onEventOnline() "  << user_id << std::endl;
 }
 
 void onEventOffline(const std::string user_id) {

@@ -17,11 +17,24 @@
 #include "player.h"
 
 
-int RoomCore::run(std::shared_ptr<RoomMessage> roomMsg) {
-    std::shared_ptr<Message> msg = roomMsg->reqMsg; 
-    std::string action = msg->request->action;
+int RoomCore::run(std::shared_ptr<RoomMessage> roomMessage) {
+    Log::info("\n\n-----------RoomCore START-----------------");
 
-    if (action == "enter_room")
+    std::shared_ptr<Message> msg = roomMessage->reqMsg; 
+    std::string action;
+    if (roomMessage->action.empty()) {
+        action = msg->request->action;
+    } else {
+        action = roomMessage->action;
+    }
+
+    Log::info(action);
+
+    if (action == "clock_tick")  // 时钟滴答
+    {
+        do_clock_tick(roomMessage);
+    }
+    else if (action == "enter_room")
     {
         do_enter_room(msg);
     }
@@ -49,35 +62,48 @@ int RoomCore::run(std::shared_ptr<RoomMessage> roomMsg) {
     {
         do_gave_up(msg);
     }
-    else if (action == "clock_tick")  // 时钟滴答
-    {
-        do_clock_tick(roomMsg);
-    }
+
+    Log::info("\n\n-----------RoomCore END-----------------");
 }
 
 void RoomCore::do_clock_tick(std::shared_ptr<RoomMessage> msg) {
     auto sharedRoom = room.lock();
+    std::cout << sharedRoom << std::endl;
     assert(sharedRoom);
 
     std::shared_ptr<GoClock> goClock = std::any_cast<std::shared_ptr<GoClock>>(msg->data);
     std::shared_ptr<RClock> bc = goClock->getBClock();
     std::shared_ptr<RClock> wc = goClock->getWClock();
 
-    // push
-    nlohmann::json j = {
-        {"room_id", sharedRoom->getId()},
-        {"bclock", *bc},
-        {"wclock", *wc},
-    };
-    std::shared_ptr<PushMessage> pmsg = std::make_shared<PushMessage>("move_timeout", j);
-    sharedRoom->pushMessageToAll(pmsg);
-
     // timeout
     bool blackTimeout = bc->getReadSecondCount() <= 0;
     bool whiteTimeout = wc->getReadSecondCount() <= 0;
     if (blackTimeout || whiteTimeout) {
         sharedRoom->switchRoomState(Room::ROOM_STATE_GAME_OVER); 
-    } 
+
+        std::string playerId;
+        if (blackTimeout) {
+            playerId = sharedRoom->getBlackPlayer()->id;
+        } else {
+            playerId = sharedRoom->getWhitePlayer()->id;
+        }
+        nlohmann::json j = {
+            {"room_id", sharedRoom->getId()},
+            {"player_id", playerId},
+        };
+        std::shared_ptr<PushMessage> pmsg = std::make_shared<PushMessage>("move_timeout", j);
+        sharedRoom->pushMessageToAll(pmsg);
+
+    } else {
+        // push clock_tick
+        nlohmann::json j = {
+            {"room_id", sharedRoom->getId()},
+            {"bclock", *bc},
+            {"wclock", *wc},
+        };
+        std::shared_ptr<PushMessage> pmsg = std::make_shared<PushMessage>("clock_tick", j);
+        sharedRoom->pushMessageToAll(pmsg);
+    }
 }
 
 void RoomCore::do_enter_room(std::shared_ptr<Message> msg)

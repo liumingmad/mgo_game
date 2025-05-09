@@ -83,10 +83,14 @@ public:
             return false;
         }
 
-        mReadSecondCount--;
-        mMoveTime = mInitTime.moveTime;
+        if (mReadSecondCount > 0) 
+        {
+            mReadSecondCount--;
+            mMoveTime = mInitTime.moveTime;
+            return false;
+        }
 
-        return mReadSecondCount > 0 ? false : true;
+        return true;
     }
 };
 NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(RClock, mInitTime, mPreTime, mReadSecondCount, mMoveTime)
@@ -124,7 +128,7 @@ public:
     void countdown()
     {
         // std::shared_ptr<GoClock> goClock = std::make_shared<GoClock>(mBClock, mWClock);
-        TimerManager::instance().addTask(mRoomId, 1000, [&]()
+        TimerManager::instance().addTask(mRoomId, 3000, [&]()
                                          {
             if (!mRunning.load(std::memory_order_acquire)) return;
 
@@ -189,6 +193,8 @@ private:
     uint8_t mPointCountingState = COUNTING_STAT_INIT;
 
 public:
+
+
     std::string getId() const;
     std::shared_ptr<GoClock> getGoClock();
     int getState() const;
@@ -253,12 +259,47 @@ public:
     // 倒计时，每3秒调用一次
     void countdown();
 
-    Room(std::string id);
-    ~Room();
+    void init() {
+        core->room = shared_from_this();
+    }
 
-    Room(const Room &one);
-    Room &operator=(const Room &one);
-    void clone(const Room &other);
+    static std::shared_ptr<Room> create(const std::string& id) {
+        std::shared_ptr<Room> r = std::make_shared<Room>(id);
+        r->init();
+        return r;
+    }
+
+    Room(std::string id)
+    : mId(id),
+      core(std::make_shared<RoomCore>())
+    {}
+
+    ~Room() {}
+
+    void clone(const Room &other)
+    {
+        this->mId = other.mId;
+        this->mBlackPlayer = other.mBlackPlayer;
+        this->mWhitePlayer = other.mWhitePlayer;
+        this->mGuest = other.mGuest;
+        this->mState = other.mState;
+        this->mBoard = other.mBoard;
+        this->mScore = other.mScore;
+    }
+
+    Room(const Room &one)
+    {
+        clone(one);
+    }
+
+    Room &operator=(const Room &one)
+    {
+        if (this == &one)
+            return *this;
+
+        clone(one);
+        return *this;
+    }
 
     Room(Room &&) = default;
     Room &operator=(Room &&) = default;

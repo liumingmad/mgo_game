@@ -15,6 +15,7 @@
 #include <server_push.h>
 #include "Stone.h"
 #include "player.h"
+#include "common_utils.h"
 
 void Core::do_sign_in(std::shared_ptr<Message> msg)
 {
@@ -66,7 +67,7 @@ std::shared_ptr<Room> create_room(const std::string user_id)
     auto now = std::chrono::system_clock::now();
     auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(now.time_since_epoch());
     std::string id = user_id + "_" + std::to_string(duration.count());
-    std::shared_ptr<Room> room = std::make_shared<Room>(id);
+    std::shared_ptr<Room> room = Room::create(id);
     return room;
 }
 
@@ -130,13 +131,13 @@ void Core::do_match_player(std::shared_ptr<Message> msg)
     {
         writeResponse(msg, Response{200, "success, please waitting 30s", MatchPlayerResponse{AUTO_MATCH_DURATION}});
 
-        if (true) {
+        if (false) {
             std::shared_ptr<Room> room = create_room(m_user_id);
             g_rooms[room->getId()] = room;
             InitClockTime time;
-            time.preTime = 300;
-            time.readSecondCount = 3;
-            time.moveTime = 30;
+            time.preTime = 1;
+            time.readSecondCount = 1;
+            time.moveTime = 10;
             room->createGoClock(time);
             room->getGoClock()->start();
             return;
@@ -190,6 +191,7 @@ void Core::do_match_player(std::shared_ptr<Message> msg)
     catch (const std::exception &e)
     {
         std::cerr << "其他错误: " << e.what() << std::endl;
+        print_stacktrace();
     }
 }
 

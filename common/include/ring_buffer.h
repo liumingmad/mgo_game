@@ -55,12 +55,12 @@ public:
     size_t pop(char *data, int len)
     {
         if (isEmpty()) {
-            std::cout << "RingBuffer pop is empty" << std::endl;
+            // std::cout << "RingBuffer pop is empty" << std::endl;
             return 0;
         }
 
         if (len > size) {
-            std::cout << "RingBuffer pop len > size" << std::endl;
+            // std::cout << "RingBuffer pop len > size" << std::endl;
             return 0;
         }
 
@@ -86,17 +86,17 @@ public:
 
     size_t peek(char* data, size_t len) {
         if (len <= 0) {
-            std::cout << "RingBuffer peek len <= 0" << std::endl;
+            // std::cout << "RingBuffer peek len <= 0" << std::endl;
             return 0;
         }
 
         if (isEmpty()) {
-            std::cout << "RingBuffer peek is empty" << std::endl;
+            // std::cout << "RingBuffer peek is empty" << std::endl;
             return 0;
         }
 
         if (len > size) {
-            std::cout << "RingBuffer peek len > size" << std::endl;
+            // std::cout << "RingBuffer peek len > size" << std::endl;
             return 0;
         }
 

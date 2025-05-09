@@ -20,6 +20,8 @@ int ServerPusher::server_push(std::string uid, std::shared_ptr<PushMessage> mess
     nlohmann::json j = *message;
     std::string json = j.dump();
 
+    std::cout << std::endl << json << std::endl;
+
     ProtocolWriter pw;
     uint8_t buf[HEADER_SIZE + json.length()];
     pw.wrap_push_header_buffer(buf, get_push_serial_number(), json);
@@ -30,6 +32,8 @@ int writeResponse(std::shared_ptr<Message> msg, const Response response)
 {
     nlohmann::json j = response;
     std::string json = j.dump();
+
+    std::cout << std::endl << json << std::endl;
 
     ProtocolWriter pw;
     uint8_t buf[HEADER_SIZE + json.length()];
