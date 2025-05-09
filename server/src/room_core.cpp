@@ -206,10 +206,6 @@ bool should_move(const std::shared_ptr<Room> room, const std::string& user_id) {
     return should_move;
 }
 
-void RoomCore::do_gave_up(std::shared_ptr<Message> msg) {
-
-}
-
 void RoomCore::do_point_counting_result(std::shared_ptr<Message> msg) {
     // 1. 通过room id获取room
     std::string room_id = msg->request->data["room_id"].get<std::string>();
@@ -314,7 +310,7 @@ void RoomCore::do_waitting_move(std::shared_ptr<Message> msg) {
     bool is_waitting_black = state & Room::ROOM_STATE_WAITTING_BLACK_MOVE;
     bool is_waitting_white = state & Room::ROOM_STATE_WAITTING_WHITE_MOVE;
     if (!is_waitting_black && !is_waitting_white) {
-        writeResponse(msg, Response{400, "move error, room state is "+room->getState(), {}});
+        writeResponse(msg, Response{400, "move error, room state is ", {}});
         return;
     } 
 
@@ -337,8 +333,6 @@ void RoomCore::do_waitting_move(std::shared_ptr<Message> msg) {
     // 6. 回复客户端200
     writeResponse(msg, Response{200, "move success", {}});
 
-    room->pushMove(stone);
-
     if (is_waitting_black) {
         room->getGoClock()->resumeWClock();
         room->switchRoomState(Room::ROOM_STATE_WAITTING_WHITE_MOVE);
@@ -347,5 +341,28 @@ void RoomCore::do_waitting_move(std::shared_ptr<Message> msg) {
         room->switchRoomState(Room::ROOM_STATE_WAITTING_BLACK_MOVE);
     }
 
+    room->pushMove(stone);
+}
+
+void RoomCore::do_gave_up(std::shared_ptr<Message> msg) {
+    std::string room_id = msg->request->data["room_id"].get<std::string>();
+    std::shared_ptr<Room> room = g_rooms[room_id];
+
+    std::string user_id = extract_user_id(msg->request->token);
+
+    // 检查是否轮到当前用户落子
+    if (!should_move(room, user_id)) {
+        writeResponse(msg, Response{400, "move error, your should be not move", {}});
+        return;
+    }
+
+    // 停掉go clock
+    room->getGoClock()->stop();
+
+    // 切换room状态
+    room->switchRoomState(Room::ROOM_STATE_GAME_OVER);
+
+    // push 给所有人
+    room->pushGiveUp(user_id);
 
 }

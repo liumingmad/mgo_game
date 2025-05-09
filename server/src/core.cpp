@@ -184,10 +184,10 @@ void Core::do_match_player(std::shared_ptr<Message> msg)
         room->createGoClock(time);
         room->getGoClock()->start();
 
-        room->pushStartGame();
-
         g_rooms[room->getId()] = room;
         room->switchRoomState(Room::ROOM_STATE_WAITTING_BLACK_MOVE);
+
+        room->pushStartGame();
 
     }
     catch (const std::exception &e)

@@ -187,6 +187,15 @@ void Room::pushMove(const Stone& stone) {
     pushMessageToAll(pmsg);
 }
 
+void Room::pushGiveUp(std::string player_id) {
+    nlohmann::json j = {
+        {"room_id", getId()},
+        {"player_id", player_id},
+    };
+    std::shared_ptr<PushMessage> pmsg = std::make_shared<PushMessage>("give_up", j);
+    pushMessageToAll(pmsg);
+}
+
 // 所有触发room state改变的事件，需要通知room内所有人
 // 0. 匹配对手成功
 // 1. 黑/白棋落子
