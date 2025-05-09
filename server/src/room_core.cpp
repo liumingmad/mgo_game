@@ -98,8 +98,16 @@ void RoomCore::do_clock_tick(std::shared_ptr<RoomMessage> msg) {
         // push clock_tick
         nlohmann::json j = {
             {"room_id", sharedRoom->getId()},
-            {"bclock", *bc},
-            {"wclock", *wc},
+            {"b_clock", {
+                {"preTime", bc->getPreTime()},
+                {"readSecondCount", bc->getReadSecondCount()},
+                {"moveTime", bc->getMoveTime()}
+            }},
+            {"w_clock", {
+                {"preTime", wc->getPreTime()},
+                {"readSecondCount", wc->getReadSecondCount()},
+                {"moveTime", wc->getMoveTime()}
+            }},
         };
         std::shared_ptr<PushMessage> pmsg = std::make_shared<PushMessage>("clock_tick", j);
         sharedRoom->pushMessageToAll(pmsg);
