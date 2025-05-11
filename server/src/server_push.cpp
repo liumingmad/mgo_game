@@ -10,13 +10,13 @@ long get_push_serial_number() {
 
 int ServerPusher::server_push(std::string uid, std::shared_ptr<PushMessage> message)
 {
-    auto it = g_uidClientMap.find(uid);
-    if (it == g_uidClientMap.end()) {
-        std::cout << uid << " not found" << std::endl;
-        return 1;
+    auto opt = g_uidClientMap.get(uid);
+    if (!opt.has_value()) {
+        std::cout << "server_push error: uid=" << uid << std::endl;
+        return -1;
     }
 
-    int fd = it->second->fd;
+    int fd = opt.value()->fd;
 
     nlohmann::json j = *message;
     std::string json = j.dump();
@@ -29,6 +29,7 @@ int ServerPusher::server_push(std::string uid, std::shared_ptr<PushMessage> mess
 
     std::shared_ptr<EVMessage> msg = std::make_shared<EVMessage>(fd, EVMESSAGE_TYPE_SERVER_PUSH, data);
     EventHandler::getInstance().post(msg);
+    return 0;
 }
 
 int writeResponse(std::shared_ptr<Message> msg, const Response response)

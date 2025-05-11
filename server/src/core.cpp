@@ -52,11 +52,9 @@ void Core::do_get_room_list(std::shared_ptr<Message> msg)
 
     // array
     std::vector<Room> rooms;
-    for (const auto &pair : g_rooms)
-    {
-        Room& room = *(pair.second);
-        rooms.push_back(room);
-    }
+    g_rooms.for_each([&rooms](const auto& pair) {
+        rooms.push_back(*(pair.second));
+    });
     resp.data = rooms;
 
     writeResponse(msg, resp);
@@ -74,7 +72,7 @@ std::shared_ptr<Room> create_room(const std::string user_id)
 void Core::do_create_room(std::shared_ptr<Message> msg)
 {
     std::shared_ptr<Room> room = create_room(m_user_id);
-    g_rooms[room->getId()] = room;
+    g_rooms.set(room->getId(), room);
 
     Response resp;
     resp.code = 200;
@@ -112,11 +110,13 @@ void Core::on_auth_success(int fd, std::string token)
     }
 
     m_user_id = user_id;
-    g_players.insert({p->id, p});
 
-    std::shared_ptr<Client> client = g_clientMap[fd];
-    client->user_id = p->id;
-    g_uidClientMap.insert({p->id, client});
+    auto client = g_clientMap.get(fd);
+    if (client.has_value()) {
+        client.value()->user_id = p->id;
+        g_uidClientMap.set(p->id, client.value());
+    }
+    g_players.set(p->id, p);
 
     // AsyncEventBus::getInstance().asyncPublish<std::string>(EventHandler::EVENT_ONLINE, user_id);
 }
@@ -133,7 +133,7 @@ void Core::do_match_player(std::shared_ptr<Message> msg)
 
         if (false) {
             std::shared_ptr<Room> room = create_room(m_user_id);
-            g_rooms[room->getId()] = room;
+            g_rooms.set(room->getId(), room);
             InitClockTime time;
             time.preTime = 1;
             time.readSecondCount = 1;
@@ -144,7 +144,8 @@ void Core::do_match_player(std::shared_ptr<Message> msg)
         }
 
         // 0. 从缓存中找自己的Player
-        std::shared_ptr<Player> self = g_players[m_user_id];
+        auto opt = g_players.get(m_user_id);
+        std::shared_ptr<Player> self = opt.value();
 
         // 1. 找到对手, 从自动匹配队列中找
         AutoPlayerMatcher &matcher = AutoPlayerMatcher::getInstance();
@@ -184,7 +185,7 @@ void Core::do_match_player(std::shared_ptr<Message> msg)
         room->createGoClock(time);
         room->getGoClock()->start();
 
-        g_rooms[room->getId()] = room;
+        g_rooms.set(room->getId(), room);
         room->switchRoomState(Room::ROOM_STATE_WAITTING_BLACK_MOVE);
 
         room->pushStartGame();
@@ -265,7 +266,7 @@ int Core::run(std::shared_ptr<Message> msg)
     )
     {
         std::string room_id = msg->request->data["room_id"].get<std::string>();
-        std::shared_ptr<Room> room = g_rooms[room_id];
+        std::shared_ptr<Room> room = g_rooms.get(room_id).value();
 
         std::shared_ptr<RoomMessage> rmsg = std::make_shared<RoomMessage>();
         rmsg->reqMsg = msg;

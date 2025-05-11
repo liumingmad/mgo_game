@@ -69,7 +69,7 @@ public:
 
 
 int add_client(int fd, struct sockaddr_in addr);
-int remove_client(std::shared_ptr<Client> client);
+int remove_client(int fd);
 void handle_write(int fd, int epfd);
 void schedule_write(int fd, const std::string &data, int epfd);
 void handleEventfd(int epfd);

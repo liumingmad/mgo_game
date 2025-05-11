@@ -22,10 +22,10 @@
 #include <common_utils.h>
 #include <event_handler.h>
 
-std::map<std::string, std::shared_ptr<Player>> g_players;
-std::map<std::string, std::shared_ptr<Room>> g_rooms;
-std::map<int, std::shared_ptr<Client>> g_clientMap;
-std::map<std::string, std::shared_ptr<Client>> g_uidClientMap;
+ThreadSafeUnorderedMap<std::string, std::shared_ptr<Player>> g_players;
+ThreadSafeUnorderedMap<std::string, std::shared_ptr<Room>> g_rooms;
+ThreadSafeUnorderedMap<int, std::shared_ptr<Client>> g_clientMap;
+ThreadSafeUnorderedMap<std::string, std::shared_ptr<Client>> g_uidClientMap;
 ThreadPool g_room_pool;
 EventBus g_EventBus;
 
@@ -147,7 +147,7 @@ int Server::run(int port)
                 } else if (fd == eventfd) {
                     handleEventfd(m_epfd);
                 } else {
-                    handle_request(g_clientMap[fd]);
+                    handle_request(g_clientMap.get(fd).value());
                 }
             } else if (one->events & EPOLLOUT) {
                 handle_write(fd, m_epfd);  // 对客户端继续写未完成的数据
@@ -202,7 +202,7 @@ int Server::handle_request(std::shared_ptr<Client> client) {
     if (n <= 0) {
         Epoll_ctl(m_epfd, EPOLL_CTL_DEL, fd, nullptr);
         Close(fd);
-        remove_client(g_clientMap[fd]);
+        remove_client(fd);
         std::cout << "client exit fd=" << fd << std::endl; 
     }
 
@@ -276,12 +276,15 @@ void Server::handle_message(std::shared_ptr<Client> client) {
 void handleHeartBeatTimerout(int fd, int epfd) {
     Epoll_ctl(epfd, EPOLL_CTL_DEL, fd, nullptr);
     Close(fd);
-    remove_client(g_clientMap[fd]);
+    remove_client(fd);
 }
 
 void handle_write(int fd, int epfd)
 {
-    auto client = g_clientMap[fd];
+    auto opt = g_clientMap.get(fd);
+    assert(opt.has_value());
+    std::shared_ptr<Client> client = opt.value(); 
+
     auto &buf = client->pendingWriteBuffer;
     ssize_t n = write(fd, buf.data(), buf.size());
     if (n > 0)
@@ -300,14 +303,18 @@ void handle_write(int fd, int epfd)
     {
         // 真正的错误（如连接断开）
         perror("write failed");
+        Epoll_ctl(epfd, EPOLL_CTL_DEL, fd, nullptr);
         close(fd);
-        g_clientMap.erase(fd);
+        remove_client(fd);
     }
 }
 
 void schedule_write(int fd, const std::string &data, int epfd)
 {
-    auto client = g_clientMap[fd];
+    auto opt = g_clientMap.get(fd);
+    assert(opt.has_value());
+    std::shared_ptr<Client> client = opt.value();
+
     client->pendingWriteBuffer += data; // 缓存数据
 
     // 尝试立即写
@@ -330,11 +337,17 @@ int add_client(int fd, struct sockaddr_in addr) {
     client->fd = fd;
     client->clientaddr = addr;
     client->activeTimestamp = get_now_milliseconds();
-    g_clientMap.insert({fd, client});
+    g_clientMap.set(fd, client);
 }
 
-int remove_client(std::shared_ptr<Client> client) {
-    std::cout << "remove client " << client->fd << std::endl;
+int remove_client(int fd) {
+    auto opt = g_clientMap.get(fd);
+    if (!opt.has_value()) {
+        std::cout << "remove client error: " << fd << std::endl;
+        return -1;
+    }
+
+    std::shared_ptr<Client> client = opt.value();
 
     std::string user_id = client->user_id;
     if (!user_id.empty()) {
@@ -373,7 +386,7 @@ void handleEventfd(int epfd)
             break;
 
         case EVMESSAGE_TYPE_SERVER_PUSH: {
-            std::shared_ptr<std::string> data = std::any_cast<std::shared_ptr<std::string>>(msg->data);
+            auto data = std::any_cast<std::shared_ptr<std::string>>(msg->data);
             schedule_write(fd, *data, epfd);
             break;
         }
