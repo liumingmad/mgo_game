@@ -25,9 +25,11 @@
 ThreadSafeUnorderedMap<std::string, std::shared_ptr<Player>> g_players;
 ThreadSafeUnorderedMap<std::string, std::shared_ptr<Room>> g_rooms;
 ThreadSafeUnorderedMap<int, std::shared_ptr<Client>> g_clientMap;
+ThreadSafeUnorderedMap<int, std::shared_ptr<Client>> g_clientIdMap;
 ThreadSafeUnorderedMap<std::string, std::shared_ptr<Client>> g_uidClientMap;
 ThreadPool g_room_pool;
 EventBus g_EventBus;
+long global_client_id = 0;
 
 
 // 怎样发现客户端掉线了？
@@ -141,16 +143,16 @@ int Server::run(int port)
         for (int i=0; i<count; i++) {
             struct epoll_event *one = evlist + i;
             int fd = one->data.fd;
-            if (one->events & EPOLLIN) {
-                if (listenfd == fd) {
-                    handleListenfd(fd, m_epfd);
-                } else if (fd == eventfd) {
-                    handleEventfd(m_epfd);
-                } else {
-                    handle_request(g_clientMap.get(fd).value());
+            if (listenfd == fd) {
+                handleListenfd(fd, m_epfd);
+            } else if (fd == eventfd) {
+                handleEventfd(m_epfd);
+            } else {
+                if (one->events & EPOLLIN) {
+                    handle_read(g_clientMap.get(fd).value());
+                } else if (one->events & EPOLLOUT) {
+                    handle_write(fd, m_epfd);  // 对客户端继续写未完成的数据
                 }
-            } else if (one->events & EPOLLOUT) {
-                handle_write(fd, m_epfd);  // 对客户端继续写未完成的数据
             }
         }
     }
@@ -192,7 +194,7 @@ std::shared_ptr<Request> parseRequest(const std::string& jsonStr) {
     return nullptr;
 }
 
-int Server::handle_request(std::shared_ptr<Client> client) {
+int Server::handle_read(std::shared_ptr<Client> client) {
     Log::info("\n\n-----------START-----------------");
     int fd = client->fd;
 
@@ -236,7 +238,7 @@ int Server::handle_request(std::shared_ptr<Client> client) {
         char tmp[len];
         rb->peek(tmp, len);
         std::shared_ptr<Message> msg = std::make_shared<Message>();
-        msg->fd = client->fd;
+        msg->cid = client->id;
         msg->header = header;
         msg->request = parseRequest(std::string(tmp+HEADER_SIZE, header->data_length));
         client->queue.enqueue(msg);
@@ -247,7 +249,6 @@ int Server::handle_request(std::shared_ptr<Client> client) {
 
     m_pool.submit([this, client]() {
         this->handle_message(client);
-        Log::info("\n\n-----------END-----------------");
     });
 
     // 清理无效数据
@@ -265,7 +266,7 @@ void Server::handle_message(std::shared_ptr<Client> client) {
         std::shared_ptr<Message> msg;
         if (queue.dequeue(msg)) {
             if (msg->header->command == ProtocolHeader::HEADER_COMMAND_HEART) {
-                response_heartbeat(msg->fd);
+                response_heartbeat(msg->cid);
             } else {
                 client->core->run(msg);
             }
@@ -331,23 +332,21 @@ void schedule_write(int fd, const std::string &data, int epfd)
 }
 
 int add_client(int fd, struct sockaddr_in addr) {
-    std::cout << "add client " << fd << std::endl;
-
     std::shared_ptr<Client> client = std::make_shared<Client>();
+    std::cout << "add client id " << client->id << std::endl;
+
     client->fd = fd;
     client->clientaddr = addr;
     client->activeTimestamp = get_now_milliseconds();
     g_clientMap.set(fd, client);
+    g_clientIdMap.set(client->id, client);
 }
 
 int remove_client(int fd) {
     auto opt = g_clientMap.get(fd);
-    if (!opt.has_value()) {
-        std::cout << "remove client error: " << fd << std::endl;
-        return -1;
-    }
-
+    assert(opt.has_value());
     std::shared_ptr<Client> client = opt.value();
+    std::cout << "remove client fd " << fd << ", id "<< client->id << std::endl;
 
     std::string user_id = client->user_id;
     if (!user_id.empty()) {
@@ -366,6 +365,7 @@ int remove_client(int fd) {
     }
 
     g_clientMap.erase(client->fd);
+    g_clientIdMap.erase(client->id);
 
     return 0;
 }
@@ -378,7 +378,12 @@ void handleEventfd(int epfd)
     std::shared_ptr<EVMessage> msg;
     while (queue.try_dequeue(msg))
     {
-        int fd = msg->fd;
+        auto client = g_clientIdMap.get(msg->cid);
+        if (!client.has_value()) {
+            continue;
+        }
+        int fd = client.value()->fd;
+
         switch (msg->type)
         {
         case EVMESSAGE_TYPE_HEARTBEAT_TIMEOUT:
@@ -387,7 +392,11 @@ void handleEventfd(int epfd)
 
         case EVMESSAGE_TYPE_SERVER_PUSH: {
             auto data = std::any_cast<std::shared_ptr<std::string>>(msg->data);
+            std::cout << "EVMESSAGE_TYPE_SERVER_PUSH fd=" << fd << ", cid=" << client.value()->id << std::endl;
+            std::cout << (data->c_str()+HEADER_SIZE) << std::endl;
             schedule_write(fd, *data, epfd);
+
+            Log::info("\n\n-----------END-----------------");
             break;
         }
 

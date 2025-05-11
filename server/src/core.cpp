@@ -34,7 +34,7 @@ void Core::do_sign_in(std::shared_ptr<Message> msg)
         resp.token = generate_jwt(std::to_string(user->id));
         writeResponse(msg, Response{200, "sign_in success", resp});
 
-        this->on_auth_success(msg->fd, resp.token);
+        this->on_auth_success(msg->cid, resp.token);
 
         Log::info("Core::run() sign_in success");
     }
@@ -81,7 +81,7 @@ void Core::do_create_room(std::shared_ptr<Message> msg)
     writeResponse(msg, resp);
 }
 
-void Core::on_auth_success(int fd, std::string token)
+void Core::on_auth_success(int cid, std::string token)
 {
     std::shared_ptr<Player> p;
 
@@ -111,7 +111,7 @@ void Core::on_auth_success(int fd, std::string token)
 
     m_user_id = user_id;
 
-    auto client = g_clientMap.get(fd);
+    auto client = g_clientIdMap.get(cid);
     if (client.has_value()) {
         client.value()->user_id = p->id;
         g_uidClientMap.set(p->id, client.value());
@@ -220,7 +220,7 @@ int Core::run(std::shared_ptr<Message> msg)
         writeResponse(msg, Response{401, "token is invalid", {}});
         return 0;
     }
-    on_auth_success(msg->fd, msg->request->token);
+    on_auth_success(msg->cid, msg->request->token);
 
 
     if (msg->request->action == "get_room_list")

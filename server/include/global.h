@@ -25,12 +25,15 @@ extern ThreadSafeUnorderedMap<std::string, std::shared_ptr<Room>> g_rooms;
 
 // <fd, client>
 extern ThreadSafeUnorderedMap<int, std::shared_ptr<Client>> g_clientMap;
+// <client_id, client>
+extern ThreadSafeUnorderedMap<int, std::shared_ptr<Client>> g_clientIdMap;
 // <user_id, client>
 extern ThreadSafeUnorderedMap<std::string, std::shared_ptr<Client>> g_uidClientMap;
 
 extern ThreadPool g_room_pool;
 
 extern EventBus g_EventBus;
+
 
 
 

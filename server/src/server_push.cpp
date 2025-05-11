@@ -16,18 +16,18 @@ int ServerPusher::server_push(std::string uid, std::shared_ptr<PushMessage> mess
         return -1;
     }
 
-    int fd = opt.value()->fd;
+    int cid = opt.value()->id;
 
     nlohmann::json j = *message;
     std::string json = j.dump();
 
-    std::cout << std::endl << json << std::endl;
+    // std::cout << std::endl << json << std::endl;
 
     std::shared_ptr<std::string> data = std::make_shared<std::string>(HEADER_SIZE + json.length(), 0);
     ProtocolWriter pw;
     pw.wrap_push_header_buffer(data->data(), get_push_serial_number(), json);
 
-    std::shared_ptr<EVMessage> msg = std::make_shared<EVMessage>(fd, EVMESSAGE_TYPE_SERVER_PUSH, data);
+    std::shared_ptr<EVMessage> msg = std::make_shared<EVMessage>(cid, EVMESSAGE_TYPE_SERVER_PUSH, data);
     EventHandler::getInstance().post(msg);
     return 0;
 }
@@ -37,24 +37,26 @@ int writeResponse(std::shared_ptr<Message> msg, const Response response)
     nlohmann::json j = response;
     std::string json = j.dump();
 
-    std::cout << std::endl << json << std::endl;
+    // std::cout << std::endl << json << std::endl;
 
     std::shared_ptr<std::string> data = std::make_shared<std::string>(HEADER_SIZE + json.length(), 0);
     ProtocolWriter pw;
     pw.wrap_response_header_buffer(data->data(), msg->header->serial_number, json);
 
-    std::shared_ptr<EVMessage> evmsg = std::make_shared<EVMessage>(msg->fd, EVMESSAGE_TYPE_SERVER_PUSH, data);
+    std::shared_ptr<EVMessage> evmsg = std::make_shared<EVMessage>(msg->cid, EVMESSAGE_TYPE_SERVER_PUSH, data);
     EventHandler::getInstance().post(evmsg);
     return 0;
 }
 
-void response_heartbeat(int fd) 
+void response_heartbeat(int cid) 
 {
     std::string text = "pong";
+    // std::cout << std::endl << text << std::endl;
+
     std::shared_ptr<std::string> data = std::make_shared<std::string>(HEADER_SIZE + text.length(), 0);
     ProtocolWriter pw;
     pw.wrap_heartbeat_header_buffer(data->data(), text);
 
-    std::shared_ptr<EVMessage> evmsg = std::make_shared<EVMessage>(fd, EVMESSAGE_TYPE_SERVER_PUSH, data);
+    std::shared_ptr<EVMessage> evmsg = std::make_shared<EVMessage>(cid, EVMESSAGE_TYPE_SERVER_PUSH, data);
     EventHandler::getInstance().post(evmsg);
 }

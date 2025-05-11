@@ -10,7 +10,8 @@
 
 class Message {
 public:
-    int fd;
+    // client_id
+    int cid;
     std::shared_ptr<ProtocolHeader> header;
     std::shared_ptr<Request> request;
 };

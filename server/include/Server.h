@@ -17,9 +17,12 @@
 constexpr size_t BUF_SIZE = 512;
 constexpr size_t RING_BUFFER_SIZE = 128 * 1024;
 
+extern long global_client_id;
+
 class Client
 {
 public:
+    int id;
     int fd;
     struct sockaddr_in clientaddr;
     // 上次收到客户端的message的时间
@@ -39,6 +42,7 @@ public:
     Client() : ringBuffer(std::make_shared<RingBuffer>(RING_BUFFER_SIZE)),
                core(std::make_shared<Core>())
     {
+        id = global_client_id++;
     }
 
     ~Client() {}
@@ -61,7 +65,7 @@ private:
 public:
     int init();
     int run(int port);
-    int handle_request(std::shared_ptr<Client> client);
+    int handle_read(std::shared_ptr<Client> client);
     void handle_message(std::shared_ptr<Client> client);
 
     int shutdown();

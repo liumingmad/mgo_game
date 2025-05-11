@@ -10,10 +10,10 @@ constexpr int EVMESSAGE_TYPE_SERVER_PUSH = 2;
 
 class EVMessage {
 public:
-    int fd;
+    int cid;
     int type;
     std::any data;
-    EVMessage(int fd, int type, std::any data): fd(fd), type(type), data(data) {} 
+    EVMessage(int cid, int type, std::any data): cid(cid), type(type), data(data) {} 
 };
 
 class EventHandler {

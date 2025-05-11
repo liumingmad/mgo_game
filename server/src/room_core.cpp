@@ -18,8 +18,6 @@
 
 int RoomCore::run(std::shared_ptr<RoomMessage> roomMessage)
 {
-    Log::info("\n\n-----------RoomCore START-----------------");
-
     std::shared_ptr<Message> msg = roomMessage->reqMsg;
     std::string action;
     if (roomMessage->action.empty())
@@ -65,8 +63,6 @@ int RoomCore::run(std::shared_ptr<RoomMessage> roomMessage)
     {
         do_gave_up(msg);
     }
-
-    Log::info("\n\n-----------RoomCore END-----------------");
 }
 
 void RoomCore::do_clock_tick(std::shared_ptr<RoomMessage> msg)
