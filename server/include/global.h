@@ -8,6 +8,7 @@
 #include "body.h"
 #include "Server.h"
 #include "room.h"
+#include "event_bus.h"
 
 
 // redis key prefix
@@ -27,6 +28,9 @@ extern std::map<int, std::shared_ptr<Client>> g_clientMap;
 extern std::map<std::string, std::shared_ptr<Client>> g_uidClientMap;
 
 extern ThreadPool g_room_pool;
+
+extern EventBus g_EventBus;
+
 
 
 #endif // GLOBAL_H

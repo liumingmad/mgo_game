@@ -11,6 +11,7 @@
 #include "TimerManager.h"
 
 static const std::string TIME_TASK_ID_HEARTBEAT = "TIME_TASK_ID_HEARTBEAT"; 
+std::string genTimerId(int fd);
 
 class Timer
 {

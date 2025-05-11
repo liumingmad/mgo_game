@@ -18,8 +18,6 @@ static std::atomic<long> g_server_push_serial_number{0};
 // 如果客户端没回复got it，超时重发一次。
 class ServerPusher {
 private:
-    std::map<std::string, PushMessage> m_pending_map;
-
     ServerPusher() {}
     ~ServerPusher() {}
 
@@ -37,5 +35,6 @@ public:
 
 int writeResponse(std::shared_ptr<Message> msg, const Response response);
 
+void response_heartbeat(int fd);
 
 #endif // SERVER_PUSH_H

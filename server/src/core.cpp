@@ -118,7 +118,7 @@ void Core::on_auth_success(int fd, std::string token)
     client->user_id = p->id;
     g_uidClientMap.insert({p->id, client});
 
-    AsyncEventBus::getInstance().asyncPublish<std::string>(EventHandler::EVENT_ONLINE, user_id);
+    // AsyncEventBus::getInstance().asyncPublish<std::string>(EventHandler::EVENT_ONLINE, user_id);
 }
 
 // 0.客户端发送，匹配申请，服务端回复ok 最长等待30秒，客户端显示进度条,等待服务器推送

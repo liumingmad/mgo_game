@@ -12,7 +12,6 @@
 #include "timer.h"
 #include "push_message.h"
 #include "server_push.h"
-#include "event_handler.h"
 
 #define MAX_CLIENT_SIZE 100
 constexpr size_t BUF_SIZE = 512;
@@ -23,13 +22,19 @@ class Client
 public:
     int fd;
     struct sockaddr_in clientaddr;
-    std::shared_ptr<RingBuffer> ringBuffer;
+    // 上次收到客户端的message的时间
+    long activeTimestamp;
     std::shared_ptr<Core> core;
     std::string user_id;
 
     // 当执行queue中Message的过程中，不能执行队列中下一个
     std::mutex mutex;
     SafeQueue<std::shared_ptr<Message>> queue;
+
+    // 读缓冲
+    std::shared_ptr<RingBuffer> ringBuffer;
+    // 写缓冲，保存每个连接剩余未写完的数据
+    std::string pendingWriteBuffer;
 
     Client() : ringBuffer(std::make_shared<RingBuffer>(RING_BUFFER_SIZE)),
                core(std::make_shared<Core>())
@@ -47,25 +52,27 @@ class Server
 {
 private:
     int m_epfd;
-    struct epoll_event m_epoll_event;
-
+    
+    // 处理client业务的线程池
     ThreadPool m_pool;
 
-    // 全局定时器，每2s触发一次，用于所有正在进行的对局，触发超时认负
     Timer m_timer;
-
-    EventHandler m_event_handler;
 
 public:
     int init();
     int run(int port);
     int handle_request(std::shared_ptr<Client> client);
     void handle_message(std::shared_ptr<Client> client);
-    void heart_timeout(int fd);
 
-    int add_client(int fd, struct sockaddr_in addr);
-    int remove_client(int fd);
     int shutdown();
 };
+
+
+int add_client(int fd, struct sockaddr_in addr);
+int remove_client(std::shared_ptr<Client> client);
+void handle_write(int fd, int epfd);
+void schedule_write(int fd, const std::string &data, int epfd);
+void handleEventfd(int epfd);
+void handleListenfd(int fd, int epfd);
 
 #endif // SERVER_H

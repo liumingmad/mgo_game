@@ -5,6 +5,7 @@
 #include <fcntl.h>
 #include <pthread.h>
 #include <unistd.h>
+#include <sys/eventfd.h>
 
 #include "wrap.h"
 #include "Server.h"
@@ -17,15 +18,45 @@
 #include "timer.h"
 #include "global.h"
 #include <TimerManager.h>
-#include <heartbeat.h>
+#include <signal.h>
+#include <common_utils.h>
+#include <event_handler.h>
 
 std::map<std::string, std::shared_ptr<Player>> g_players;
 std::map<std::string, std::shared_ptr<Room>> g_rooms;
 std::map<int, std::shared_ptr<Client>> g_clientMap;
 std::map<std::string, std::shared_ptr<Client>> g_uidClientMap;
 ThreadPool g_room_pool;
+EventBus g_EventBus;
+
+
+// 怎样发现客户端掉线了？
+// 两种情况：
+// 1. 正常断开，客户端发fin
+//      1.当服务端发送fin之前，调用read，返回0, write正常
+//      2.当服务端发送fin后，调用read，会返回-1 && errno == EBADF
+
+// 2. 异常断开，客户端TCP状态机处于close状态，
+//      当服务器调用read时，如果内核读缓冲没东西，则阻塞
+//      当服务器调用write时，客户端会回复RST, 服务器收到后，会给进程发送SIGPIPE
+//          1.没忽略SIGPIPE, 默认会杀进程, 
+//          2.如果忽略了SIGPIPE, write会立刻返回-1，errno == EPIPE
+
+// 正常断开比较容易处理，
+// 当异常断开时，为了能早点发现客户端close了，就要检查客户端心跳包，如果超时没收到，直接调用close, 把fd踢掉
+
+// 当给客户端写消息时，如果内核缓冲区满了，write阻塞了怎么办
+// 用epoll监听，EPOLLOUT, 分段去写, 在水平触发下，写完了要取消监听
+
+// 问题1：处理心跳超时的线程切换
+// 问题2: 处理写阻塞, 加了写缓冲，如果内核缓冲满了，等到可写，继续发送
+// 解决办法，用epoll监听一个消息队列，把这两个问题，分别包装成消息，发送到epoll线程处理
 
 int Server::init() {
+    // 忽略 SIGPIPE，防止进程因 write 出错而崩溃
+    // 忽略这个信号后，write时，会返回-1，errno == EPIPE
+    signal(SIGPIPE, SIG_IGN);
+
     // 初始化数据库连接池
     DBConnectionPool::getInstance()->initPool(
         "tcp://172.17.0.1:3306",
@@ -48,7 +79,7 @@ int Server::init() {
     AsyncEventBus& bus = AsyncEventBus::getInstance();
     bus.start();
 
-    m_event_handler.init();
+    EventHandler::getInstance().init();
 
     // 定时器
     m_timer.start();
@@ -63,9 +94,15 @@ int Server::shutdown() {
     return 0;
 }
 
+int set_nonblocking(int fd) {
+    int flags = fcntl(fd, F_GETFL, 0);
+    return fcntl(fd, F_SETFL, flags | O_NONBLOCK);
+}
+
 int Server::run(int port)
 {
     int listenfd = Socket(AF_INET, SOCK_STREAM, 0);
+    set_nonblocking(listenfd);
     std::cout << "listen fd=" << listenfd << std::endl; 
 
 
@@ -86,9 +123,16 @@ int Server::run(int port)
     m_epfd = Epoll_create(1);
 
     // for socket listenfd
-    m_epoll_event.events = EPOLLIN;
-    m_epoll_event.data.fd = listenfd;
-    Epoll_ctl(m_epfd, EPOLL_CTL_ADD, listenfd, &m_epoll_event);
+    epoll_event ev {};
+    ev.events = EPOLLIN;
+    ev.data.fd = listenfd;
+    Epoll_ctl(m_epfd, EPOLL_CTL_ADD, listenfd, &ev);
+
+    // for eventfd
+    int eventfd = EventHandler::getInstance().getEventfd();
+    ev.events = EPOLLIN;
+    ev.data.fd = eventfd;
+    Epoll_ctl(m_epfd, EPOLL_CTL_ADD, eventfd, &ev);
 
     struct  epoll_event evlist[MAX_CLIENT_SIZE];
     
@@ -96,33 +140,40 @@ int Server::run(int port)
         int count = Epoll_wait(m_epfd, evlist, MAX_CLIENT_SIZE, -1);
         for (int i=0; i<count; i++) {
             struct epoll_event *one = evlist + i;
+            int fd = one->data.fd;
             if (one->events & EPOLLIN) {
-                int fd = one->data.fd;
                 if (listenfd == fd) {
-                    struct sockaddr_in clientaddr;
-                    socklen_t len = sizeof(clientaddr);
-                    int clientfd = Accept(fd, (struct sockaddr*)&clientaddr, &len);
-                    std::cout << "enter clientfd " << clientfd << std::endl; 
-
-                    struct epoll_event ev;
-                    ev.events = EPOLLIN;
-                    ev.data.fd = clientfd;
-                    Epoll_ctl(m_epfd, EPOLL_CTL_ADD, clientfd, &ev);
-                    add_client(clientfd, clientaddr);
-
+                    handleListenfd(fd, m_epfd);
+                } else if (fd == eventfd) {
+                    handleEventfd(m_epfd);
                 } else {
-                    if (handle_request(g_clientMap[fd]) == 0) {
-                        Epoll_ctl(m_epfd, EPOLL_CTL_DEL, fd, &m_epoll_event);
-                        Close(fd);
-                        remove_client(fd);
-                        std::cout << "client exit fd=" << fd << std::endl; 
-                    }
+                    handle_request(g_clientMap[fd]);
                 }
+            } else if (one->events & EPOLLOUT) {
+                handle_write(fd, m_epfd);  // 对客户端继续写未完成的数据
             }
         }
     }
 
     return 0;
+}
+
+std::string genTimerId(int fd) {
+    return TIME_TASK_ID_HEARTBEAT + to_string(fd);
+}
+
+void handleListenfd(int fd, int epfd) {
+    struct sockaddr_in clientaddr;
+    socklen_t len = sizeof(clientaddr);
+    int clientfd = Accept(fd, (struct sockaddr*)&clientaddr, &len);
+    set_nonblocking(clientfd);
+    std::cout << "enter clientfd " << clientfd << std::endl; 
+
+    struct epoll_event ev;
+    ev.events = EPOLLIN;
+    ev.data.fd = clientfd;
+    Epoll_ctl(epfd, EPOLL_CTL_ADD, clientfd, &ev);
+    add_client(clientfd, clientaddr);
 }
 
 std::shared_ptr<Request> parseRequest(const std::string& jsonStr) {
@@ -143,13 +194,25 @@ std::shared_ptr<Request> parseRequest(const std::string& jsonStr) {
 
 int Server::handle_request(std::shared_ptr<Client> client) {
     Log::info("\n\n-----------START-----------------");
+    int fd = client->fd;
 
     char buf[BUF_SIZE];
     bzero(buf, BUF_SIZE);
-    int n = Read(client->fd, buf, BUF_SIZE);
-    if (n == 0) {
-        return 0;
+    int n = Read(fd, buf, BUF_SIZE);
+    if (n <= 0) {
+        Epoll_ctl(m_epfd, EPOLL_CTL_DEL, fd, nullptr);
+        Close(fd);
+        remove_client(g_clientMap[fd]);
+        std::cout << "client exit fd=" << fd << std::endl; 
     }
+
+    // 读到任何东西，都认为客户端活着
+    client->activeTimestamp = get_now_milliseconds();
+    // 如果超过30s，客户端没有任何活动，就超时
+    TimerManager::instance().addTask(genTimerId(fd), 30000, [fd](){
+        auto msg = std::make_shared<EVMessage>(fd, EVMESSAGE_TYPE_HEARTBEAT_TIMEOUT, nullptr);
+        EventHandler::getInstance().post(msg);
+    });
 
     // 查看ringbuffer中是否残存数据, 如果存在，就沾包
     std::shared_ptr<RingBuffer> rb = client->ringBuffer;
@@ -202,11 +265,6 @@ void Server::handle_message(std::shared_ptr<Client> client) {
         std::shared_ptr<Message> msg;
         if (queue.dequeue(msg)) {
             if (msg->header->command == ProtocolHeader::HEADER_COMMAND_HEART) {
-                int fd = msg->fd;
-                TimerManager::instance().addTask(TIME_TASK_ID_HEARTBEAT, 30000, [this, fd](){
-                    this->heart_timeout(fd);
-                });
-                std::cout << msg->fd << ": HEADER_COMMAND_HEART" << std::endl;
                 response_heartbeat(msg->fd);
             } else {
                 client->core->run(msg);
@@ -215,44 +273,70 @@ void Server::handle_message(std::shared_ptr<Client> client) {
     }
 }
 
-void printMap(std::map<int, std::shared_ptr<Client>> map) {
-    std::map<int, std::shared_ptr<Client>>::iterator it = map.begin();
-    while(it != map.end()) {
-        int fd = it->first;
-        std::shared_ptr<Client> cli = it->second;
-        std::cout << fd << ", " << cli->fd << std::endl;
-        it++;
+void handleHeartBeatTimerout(int fd, int epfd) {
+    Epoll_ctl(epfd, EPOLL_CTL_DEL, fd, nullptr);
+    Close(fd);
+    remove_client(g_clientMap[fd]);
+}
+
+void handle_write(int fd, int epfd)
+{
+    auto client = g_clientMap[fd];
+    auto &buf = client->pendingWriteBuffer;
+    ssize_t n = write(fd, buf.data(), buf.size());
+    if (n > 0)
+    {
+        buf.erase(0, n); // 移除已发送部分
+        if (buf.empty())
+        {
+            // 写完了，取消 EPOLLOUT 监听，避免 busy loop
+            epoll_event ev{};
+            ev.events = EPOLLIN;
+            ev.data.fd = fd;
+            epoll_ctl(epfd, EPOLL_CTL_MOD, fd, &ev);
+        }
+    }
+    else if (n == -1 && (errno != EAGAIN && errno != EWOULDBLOCK))
+    {
+        // 真正的错误（如连接断开）
+        perror("write failed");
+        close(fd);
+        g_clientMap.erase(fd);
     }
 }
 
-void Server::heart_timeout(int fd) {
-    Epoll_ctl(m_epfd, EPOLL_CTL_DEL, fd, &m_epoll_event);
-    Close(fd);
-    this->remove_client(fd);
-    std::cout << "heart timeout" << std::endl;
+void schedule_write(int fd, const std::string &data, int epfd)
+{
+    auto client = g_clientMap[fd];
+    client->pendingWriteBuffer += data; // 缓存数据
+
+    // 尝试立即写
+    handle_write(fd, epfd);
+
+    // 如果还有剩余，监听 EPOLLOUT
+    if (!client->pendingWriteBuffer.empty())
+    {
+        epoll_event ev{};
+        ev.events = EPOLLIN | EPOLLOUT;
+        ev.data.fd = fd;
+        epoll_ctl(epfd, EPOLL_CTL_MOD, fd, &ev);
+    }
 }
 
-int Server::add_client(int fd, struct sockaddr_in addr) {
+int add_client(int fd, struct sockaddr_in addr) {
     std::cout << "add client " << fd << std::endl;
 
     std::shared_ptr<Client> client = std::make_shared<Client>();
     client->fd = fd;
     client->clientaddr = addr;
+    client->activeTimestamp = get_now_milliseconds();
     g_clientMap.insert({fd, client});
-    // printMap(g_clientMap);
-
-    // TimerManager::instance().addTask(Timer::TIME_TASK_ID_HEARTBEAT, 30000, [this, fd](){
-    //     heart_timeout(fd);
-    // });
-    return 0;
 }
 
-int Server::remove_client(int fd) {
-    std::cout << "remove client " << fd << std::endl;
+int remove_client(std::shared_ptr<Client> client) {
+    std::cout << "remove client " << client->fd << std::endl;
 
-    std::shared_ptr<Client> client = g_clientMap[fd];
     std::string user_id = client->user_id;
-
     if (!user_id.empty()) {
         // 删除user_id和client的对应关系
         g_uidClientMap.erase(client->user_id);
@@ -268,11 +352,37 @@ int Server::remove_client(int fd) {
         // }
     }
 
-    g_clientMap.erase(fd);
-    // printMap(g_clientMap);
-
-    AsyncEventBus::getInstance().asyncPublish(EventHandler::EVENT_OFFLINE, user_id);
+    g_clientMap.erase(client->fd);
 
     return 0;
 }
 
+void handleEventfd(int epfd)
+{
+    EventHandler& handler = EventHandler::getInstance();
+    auto& queue = handler.getConcurrentQueue();
+    // dequeue
+    std::shared_ptr<EVMessage> msg;
+    while (queue.try_dequeue(msg))
+    {
+        int fd = msg->fd;
+        switch (msg->type)
+        {
+        case EVMESSAGE_TYPE_HEARTBEAT_TIMEOUT:
+            handleHeartBeatTimerout(fd, epfd);
+            break;
+
+        case EVMESSAGE_TYPE_SERVER_PUSH: {
+            std::shared_ptr<std::string> data = std::any_cast<std::shared_ptr<std::string>>(msg->data);
+            schedule_write(fd, *data, epfd);
+            break;
+        }
+
+        default:
+            break;
+        }
+    }
+
+    // clean flag
+    handler.cleanEventfd();
+}

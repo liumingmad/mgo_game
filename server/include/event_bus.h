@@ -1,3 +1,6 @@
+#ifndef EVENT_BUF_H
+#define EVENT_BUF_H
+
 #include <unordered_map>
 #include <vector>
 #include <functional>
@@ -126,3 +129,5 @@ private:
     std::condition_variable cv_;
     std::atomic<bool> stop_flag_;
 };
+
+#endif // EVENT_BUF_H

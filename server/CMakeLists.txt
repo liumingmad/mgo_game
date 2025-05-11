@@ -16,6 +16,8 @@ aux_source_directory(src SRC_LIST)
 # 添加静态库
 add_library(server STATIC ${SRC_LIST})
 
+include_directories(/usr/local/include/concurrentqueue)
+
 # 链接静态库和动态库
 find_package(OpenSSL REQUIRED)
 find_package(CURL REQUIRED)

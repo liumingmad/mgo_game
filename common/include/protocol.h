@@ -166,22 +166,23 @@ public:
 class ProtocolWriter
 {
 public:
-    void wrap_heartbeat_header_buffer(uint8_t* buf, u_int16_t serial_number, std::string data)
+    void wrap_heartbeat_header_buffer(char* buf, std::string data)
     {
-        wrap_header_buffer(buf, ProtocolHeader::HEADER_COMMAND_HEART, serial_number, data);
+        static long heartbeat_serial_number = 0;
+        wrap_header_buffer(buf, ProtocolHeader::HEADER_COMMAND_HEART, heartbeat_serial_number, data);
     }
 
-    void wrap_push_header_buffer(uint8_t* buf, u_int16_t serial_number, std::string data)
+    void wrap_push_header_buffer(char* buf, u_int16_t serial_number, std::string data)
     {
         wrap_header_buffer(buf, ProtocolHeader::HEADER_COMMAND_SERVER_PUSH, serial_number, data);
     }
 
-    void wrap_response_header_buffer(uint8_t* buf, u_int16_t serial_number, std::string data)
+    void wrap_response_header_buffer(char* buf, u_int16_t serial_number, std::string data)
     {
         wrap_header_buffer(buf, ProtocolHeader::HEADER_COMMAND_BUSSNESS, serial_number, data);
     }
 
-    void wrap_header_buffer(uint8_t* buf, u_int8_t command, u_int16_t serial_number, std::string data)
+    void wrap_header_buffer(char* buf, u_int8_t command, u_int16_t serial_number, std::string data)
     {
         // MOGO
         buf[0] = 'M';
@@ -205,8 +206,8 @@ public:
         buf[6] = command;
 
         // Serial Number
-        buf[7] = static_cast<uint8_t>((serial_number >> 8) & 0xFF);
-        buf[8] = static_cast<uint8_t>(serial_number & 0xFF);
+        buf[7] = static_cast<char>((serial_number >> 8) & 0xFF);
+        buf[8] = static_cast<char>(serial_number & 0xFF);
 
         // data length
         uint32_t number = data.length();
@@ -215,12 +216,12 @@ public:
         memcpy(buf+HEADER_SIZE, data.c_str(), data.length());
     }
 
-    void intToBytes(uint32_t value, uint8_t bytes[4])
+    void intToBytes(uint32_t value, char bytes[4])
     {
-        bytes[0] = static_cast<uint8_t>((value >> 24) & 0xFF);
-        bytes[1] = static_cast<uint8_t>((value >> 16) & 0xFF);
-        bytes[2] = static_cast<uint8_t>((value >> 8) & 0xFF);
-        bytes[3] = static_cast<uint8_t>(value & 0xFF);
+        bytes[0] = static_cast<char>((value >> 24) & 0xFF);
+        bytes[1] = static_cast<char>((value >> 16) & 0xFF);
+        bytes[2] = static_cast<char>((value >> 8) & 0xFF);
+        bytes[3] = static_cast<char>(value & 0xFF);
     }
 };
 
