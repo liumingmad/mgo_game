@@ -17,6 +17,10 @@ public:
     // 基于应答的状态机
     int run(std::shared_ptr<Message> msg);
 
+    void findRoomListByPlayer(std::vector<std::shared_ptr<Room>>& list, 
+        std::vector<std::shared_ptr<Room>>& guestList, std::shared_ptr<Player> p);
+    std::shared_ptr<Room> getNeedBackRoom(std::shared_ptr<Player> p);
+
     void do_online(std::shared_ptr<Message> msg);
     void do_offline(std::shared_ptr<Message> msg);
 

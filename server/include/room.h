@@ -193,38 +193,48 @@ private:
     uint8_t mPointCountingState = COUNTING_STAT_INIT;
 
 public:
-
-
-    std::string getId() const;
-    std::shared_ptr<GoClock> getGoClock();
-    int getState() const;
-    std::map<std::string, std::shared_ptr<Player>> getGuests() const;
-    Board &getBoard();
-    const Board &getConstBoard() const;
-
-    void setBlackPlayer(std::shared_ptr<Player> p);
-    void setWhitePlayer(std::shared_ptr<Player> p);
-    std::shared_ptr<Player> getBlackPlayer() const;
-    std::shared_ptr<Player> getWhitePlayer() const;
-    void createGoClock(InitClockTime time);
-    bool addGuest(std::shared_ptr<Player>);
-    bool removeGuest(std::shared_ptr<Player>);
-    RoomRole getRole(std::shared_ptr<Player>) const;
-
-    void start();
-
-    void pushMessageToAll(std::shared_ptr<PushMessage> pmsg) const;
-    void pushStartGame();
-    void pushMove(const Stone& stone);
-    void pushGiveUp(std::string player_id);    
-
     // 当执行queue中Message的过程中，不能执行队列中下一个
     std::mutex mutex;
     SafeQueue<std::shared_ptr<RoomMessage>> queue;
     std::shared_ptr<RoomCore> core;
-
     void postRoomMessage(std::shared_ptr<RoomMessage> msg);
     void handleRoomMessage(std::shared_ptr<RoomMessage> msg);
+
+    std::string getId() const;
+    int getState() const;
+    std::shared_ptr<GoClock> getGoClock() const;
+    Board &getBoard();
+    std::map<std::string, std::shared_ptr<Player>> getGuests() const;
+    const Board &getConstBoard() const;
+    std::shared_ptr<Player> getBlackPlayer() const;
+    std::shared_ptr<Player> getWhitePlayer() const;
+    RoomRole getRole(std::shared_ptr<Player>) const;
+    bool is_guest(std::shared_ptr<Player> p) const;
+    bool is_player(std::shared_ptr<Player> p) const;
+    bool is_counting_selecting(std::shared_ptr<Player> p) const;
+    bool is_both_accept() const;
+
+    void setBlackPlayer(std::shared_ptr<Player> p);
+    void setWhitePlayer(std::shared_ptr<Player> p);
+    void createGoClock(InitClockTime time);
+    bool addGuest(std::shared_ptr<Player>);
+    bool removeGuest(std::shared_ptr<Player>);
+
+    // 判定胜负
+    void markBlackWins();
+    void markWhiteWins();
+
+
+    void start();
+
+    void pushMessageToAll(std::shared_ptr<PushMessage> pmsg) const;
+    void pushStartGame() const;
+    void pushMove(const Stone& stone);
+    void pushGiveUp(std::string player_id) const;    
+    void pushGameResult() const;
+    void pushOffline(std::string player_id) const;
+    void pushOnline(std::string player_id) const;
+
 
     // 数目的状态
     // 每个人有三种状态：argee/reject/selecting
@@ -305,10 +315,6 @@ public:
     Room(Room &&) = default;
     Room &operator=(Room &&) = default;
 
-    bool is_guest(std::shared_ptr<Player> p) const;
-    bool is_player(std::shared_ptr<Player> p) const;
-    bool is_counting_selecting(std::shared_ptr<Player> p) const;
-    bool is_both_accept() const;
 };
 
 void to_json(nlohmann::json &j, const Room &r);

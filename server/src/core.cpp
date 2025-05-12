@@ -129,7 +129,17 @@ void Core::on_auth_success(int cid, std::string token)
         g_uidClientMap.set(p->id, client.value());
     }
 
-    // AsyncEventBus::getInstance().asyncPublish<std::string>(EventHandler::EVENT_ONLINE, user_id);
+    // 检查是否需要重回room
+    // 离线没超过180s, room的对局还在等你回来
+    auto room = getNeedBackRoom(p);
+    if (room) {
+        std::shared_ptr<RoomMessage> rmsg = std::make_shared<RoomMessage>();
+        rmsg->room = room;
+        rmsg->action = "online";
+        rmsg->data = p;
+        room->postRoomMessage(rmsg);
+    }
+
 }
 
 // 0.客户端发送，匹配申请，服务端回复ok 最长等待30秒，客户端显示进度条,等待服务器推送
@@ -234,14 +244,32 @@ bool Core::checkAuth(std::shared_ptr<Message> msg)
     return false;
 }
 
-void Core::do_online(std::shared_ptr<Message> msg)
+std::shared_ptr<Room> Core::getNeedBackRoom(std::shared_ptr<Player> p)
 {
-    std::cout << "do_online()" << std::endl;
+    // 判断自己是否在某个房间，处于离线状态，且room未结束
+    std::shared_ptr<Room> sp = nullptr;
+    g_rooms.for_each([p, &sp](const auto &pair)
+    { 
+        std::shared_ptr<Room> room = pair.second;
+        auto bp = room->getBlackPlayer();
+        auto wp = room->getWhitePlayer();
+        if (p->id == bp->id && bp->state == PLAYER_WAITTING_REBACK) {
+            sp = room;
+            return;
+        }
+        if (p->id == wp->id && wp->state == PLAYER_WAITTING_REBACK) {
+            sp = room;
+            return;
+        }
+    }); 
+
+    return sp;
 }
 
 // 找到某人所在的room
-void findRoomListByPlayer(std::vector<std::shared_ptr<Room>>& list, std::shared_ptr<Player> p) {
-    g_rooms.for_each([&list, p](const auto &pair)
+void Core::findRoomListByPlayer(std::vector<std::shared_ptr<Room>>& list, 
+    std::vector<std::shared_ptr<Room>>& guestList, std::shared_ptr<Player> p) {
+    g_rooms.for_each([&list, &guestList, p](const auto &pair)
     { 
         std::shared_ptr<Room> room = pair.second;
         if (p->id == room->getBlackPlayer()->id) {
@@ -254,7 +282,7 @@ void findRoomListByPlayer(std::vector<std::shared_ptr<Room>>& list, std::shared_
         }
         for (auto [pid, player] : room->getGuests()) {
             if (p->id == pid) {
-                list.push_back(room);
+                guestList.push_back(room);
                 return;
             }
         }
@@ -273,20 +301,14 @@ void Core::do_offline(std::shared_ptr<Message> msg)
         std::string user_id = client->user_id;
         if (!user_id.empty())
         {
-            // 删除user_id和client的对应关系
-            g_uidClientMap.erase(client->user_id);
-
-            // 清除redis缓存
-            const std::string key_user_id = KEY_USER_PREFIX + user_id;
-            Redis &redis = RedisPool::getInstance().getRedis();
-            redis.del(key_user_id);
-
-            g_players.erase(user_id);
-
             // 如果再room里，通知room内所有人，某人离线
             // 向room的消息队列发消息
+
+            // 以棋手身份，所在room
             std::vector<std::shared_ptr<Room>> rooms;
-            findRoomListByPlayer(rooms, msg->self);
+            // 以观战身份，所在的room
+            std::vector<std::shared_ptr<Room>> guestrooms;
+            findRoomListByPlayer(rooms, guestrooms, msg->self);
 
             for (auto one : rooms) {
                 std::shared_ptr<RoomMessage> rmsg = std::make_shared<RoomMessage>();
@@ -294,6 +316,9 @@ void Core::do_offline(std::shared_ptr<Message> msg)
                 rmsg->reqMsg = msg;
                 one->postRoomMessage(rmsg);
             }
+
+            g_uidClientMap.erase(client->user_id);
+            g_players.erase(user_id);
         }
 
         g_clientMap.erase(client->fd);
@@ -304,6 +329,10 @@ void Core::do_offline(std::shared_ptr<Message> msg)
         std::cerr << "其他错误: " << e.what() << std::endl;
         print_stacktrace();
     }
+}
+
+void Core::do_online(std::shared_ptr<Message> msg) {
+
 }
 
 int Core::run(std::shared_ptr<Message> msg)

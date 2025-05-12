@@ -35,6 +35,14 @@ int RoomCore::run(std::shared_ptr<RoomMessage> roomMessage)
     {
         do_clock_tick(roomMessage);
     }
+    else if (action == "online")
+    {
+        do_online(roomMessage);
+    }
+    else if (action == "offline_timeout")
+    {
+        do_offline_timeout(roomMessage);
+    }
     else if (action == "offline")
     {
         do_offline(roomMessage);
@@ -81,7 +89,11 @@ void RoomCore::do_clock_tick(std::shared_ptr<RoomMessage> msg)
     bool whiteTimeout = wc->getReadSecondCount() <= 0;
     if (blackTimeout || whiteTimeout)
     {
-        room->switchRoomState(Room::ROOM_STATE_GAME_OVER);
+        if (blackTimeout) {
+            room->markBlackWins();
+        } else {
+            room->markWhiteWins();
+        }
 
         std::string playerId;
         if (blackTimeout)
@@ -112,9 +124,6 @@ void RoomCore::do_clock_tick(std::shared_ptr<RoomMessage> msg)
     }
 }
 
-void RoomCore::do_offline(std::shared_ptr<RoomMessage> msg) {
-    // 通知某人离线
-}
 
 void RoomCore::do_enter_room(std::shared_ptr<RoomMessage> roommsg)
 {
@@ -390,11 +399,11 @@ void RoomCore::do_gave_up(std::shared_ptr<RoomMessage> roommsg)
             return;
         }
 
-        // 停掉go clock
-        room->getGoClock()->stop();
-
-        // 切换room状态
-        room->switchRoomState(Room::ROOM_STATE_GAME_OVER);
+        if (user_id == room->getBlackPlayer()->id) {
+            room->markWhiteWins();
+        } else if (user_id == room->getWhitePlayer()->id) {
+            room->markBlackWins();
+        }
 
         // push 给所有人
         room->pushGiveUp(user_id);
@@ -403,4 +412,74 @@ void RoomCore::do_gave_up(std::shared_ptr<RoomMessage> roommsg)
     {
         std::cerr << "其他错误: " << e.what() << std::endl;
     }
+}
+
+std::string getOfflineTaskId(std::string roomId) {
+    return "OFFLINE_TIMEOUT_" + roomId;
+}
+
+void RoomCore::do_online(std::shared_ptr<RoomMessage> roommsg) 
+{
+    auto room = roommsg->room;
+    auto p = std::any_cast<std::shared_ptr<Player>>(roommsg->data);
+
+    // p 是新创建的对象，所以要把room里保存的旧对象拷贝到新对象里
+    // 调用赋值构造
+    p = room->getBlackPlayer();
+    p->state = PLAYER_ONLINE;
+
+    // 取消超时检查
+    std::string taskId = getOfflineTaskId(room->getId());
+    TimerManager::instance().removeTask(taskId);
+
+    // 打开go clock
+    room->getGoClock()->start();
+
+    // 通知room内其他人，自己上线
+    room->pushOnline(p->id);
+} 
+
+void RoomCore::do_offline_timeout(std::shared_ptr<RoomMessage> roommsg) {
+    auto msg = roommsg->reqMsg;
+    auto room = roommsg->room;
+    std::string user_id = msg->self->id;
+
+    if (user_id == room->getBlackPlayer()->id) {
+        room->markBlackWins(); 
+    } else if (user_id == room->getBlackPlayer()->id) {
+        room->markWhiteWins(); 
+    }
+    room->pushGameResult();
+}
+
+void RoomCore::do_offline(std::shared_ptr<RoomMessage> roommsg) 
+{
+    auto msg = roommsg->reqMsg;
+    auto room = roommsg->room;
+    std::string user_id = msg->self->id;
+
+    if (room->is_player(msg->self)) {
+        // mark offline
+        msg->self->state = PLAYER_WAITTING_REBACK;
+
+        // pause go clock
+        room->getGoClock()->stop();
+
+        // 开启定时器，如果180s，没回来，则判负
+        std::string taskId = getOfflineTaskId(room->getId());
+        TimerManager::instance().addTask(taskId, 180*1000, [&room, &user_id]() {
+            // 得用发消息的方式，否则又并发了
+            std::shared_ptr<RoomMessage> rmsg = std::make_shared<RoomMessage>();
+            rmsg->room = room;
+            rmsg->action = "offline_timeout";
+            rmsg->data = user_id;
+            room->postRoomMessage(rmsg);
+        });
+
+    } else {
+        room->removeGuest(msg->self);
+    }
+
+    // 通知room内其他人，某人离线
+    room->pushOffline(user_id);
 }

@@ -115,7 +115,7 @@ RoomRole Room::getRole(std::shared_ptr<Player> p) const
     return RoomRole::UNKNOW;
 }
 
-std::shared_ptr<GoClock> Room::getGoClock() {
+std::shared_ptr<GoClock> Room::getGoClock() const {
     return mGoClock;
 }
 
@@ -162,7 +162,7 @@ bool Room::removeGuest(std::shared_ptr<Player> p)
 
 
 // 给两个人分别推送一条消息, 客户端之间跳转到room page开始下棋
-void Room::pushStartGame() {
+void Room::pushStartGame() const {
     StartGameBody body(*this);
     std::shared_ptr<PushMessage> pmsg = std::make_shared<PushMessage>("start_game", body);
     pushMessageToAll(pmsg);
@@ -188,13 +188,25 @@ void Room::pushMove(const Stone& stone) {
     pushMessageToAll(pmsg);
 }
 
-void Room::pushGiveUp(std::string player_id) {
+void Room::pushGiveUp(std::string player_id) const {
     nlohmann::json j = {
         {"room_id", getId()},
         {"player_id", player_id},
     };
     std::shared_ptr<PushMessage> pmsg = std::make_shared<PushMessage>("give_up", j);
     pushMessageToAll(pmsg);
+}
+
+void Room::pushGameResult() const {
+
+}
+
+void Room::pushOffline(std::string player_id) const {
+
+}
+
+void Room::pushOnline(std::string player_id) const {
+
 }
 
 // 所有触发room state改变的事件，需要通知room内所有人
@@ -216,6 +228,17 @@ void Room::switchPointCountingState(u_int8_t new_state)
 {
     mPointCountingState = new_state;
 }
+
+void Room::markBlackWins() {
+    getGoClock()->stop();
+    switchRoomState(Room::ROOM_STATE_GAME_OVER);
+}
+
+void Room::markWhiteWins() {
+    getGoClock()->stop();
+    switchRoomState(Room::ROOM_STATE_GAME_OVER);
+}
+
 
 void Room::handleRoomMessage(std::shared_ptr<RoomMessage> msg) {
 }

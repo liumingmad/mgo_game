@@ -20,6 +20,8 @@ public:
 
     int run(std::shared_ptr<RoomMessage> msg);
     
+    void do_offline_timeout(std::shared_ptr<RoomMessage> roommsg);
+    void do_online(std::shared_ptr<RoomMessage> msg);
     void do_offline(std::shared_ptr<RoomMessage> msg);
     void do_enter_room(std::shared_ptr<RoomMessage> msg);
     void do_exit_room(std::shared_ptr<RoomMessage> msg);
