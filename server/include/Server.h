@@ -65,18 +65,21 @@ private:
 public:
     int init();
     int run(int port);
-    int handle_read(std::shared_ptr<Client> client);
     void handle_message(std::shared_ptr<Client> client);
-
     int shutdown();
+
+    int add_client(int fd, struct sockaddr_in addr);
+    int remove_client(int fd);
+
+    int handle_read(int fd);
+    void handle_write(int fd);
+
+    void schedule_write(int fd, const std::string &data);
+    void handleEventfd();
+    void handleListenfd(int fd);
+    void handleHeartBeatTimerout(int fd);
 };
 
 
-int add_client(int fd, struct sockaddr_in addr);
-int remove_client(int fd);
-void handle_write(int fd, int epfd);
-void schedule_write(int fd, const std::string &data, int epfd);
-void handleEventfd(int epfd);
-void handleListenfd(int fd, int epfd);
 
 #endif // SERVER_H

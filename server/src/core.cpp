@@ -35,8 +35,6 @@ void Core::do_sign_in(std::shared_ptr<Message> msg)
         writeResponse(msg, Response{200, "sign_in success", resp});
 
         this->on_auth_success(msg->cid, resp.token);
-
-        Log::info("Core::run() sign_in success");
     }
     catch (const std::exception &e)
     {
@@ -46,18 +44,24 @@ void Core::do_sign_in(std::shared_ptr<Message> msg)
 
 void Core::do_get_room_list(std::shared_ptr<Message> msg)
 {
-    Response resp;
-    resp.code = 200;
-    resp.message = "get_room_list success";
+    try
+    {
+        Response resp;
+        resp.code = 200;
+        resp.message = "get_room_list success";
 
-    // array
-    std::vector<Room> rooms;
-    g_rooms.for_each([&rooms](const auto& pair) {
-        rooms.push_back(*(pair.second));
-    });
-    resp.data = rooms;
+        // array
+        std::vector<Room> rooms;
+        g_rooms.for_each([&rooms](const auto &pair)
+                         { rooms.push_back(*(pair.second)); });
+        resp.data = rooms;
 
-    writeResponse(msg, resp);
+        writeResponse(msg, resp);
+    }
+    catch (const std::exception &e)
+    {
+        std::cerr << "其他错误: " << e.what() << std::endl;
+    }
 }
 
 std::shared_ptr<Room> create_room(const std::string user_id)
@@ -71,14 +75,22 @@ std::shared_ptr<Room> create_room(const std::string user_id)
 
 void Core::do_create_room(std::shared_ptr<Message> msg)
 {
-    std::shared_ptr<Room> room = create_room(m_user_id);
-    g_rooms.set(room->getId(), room);
+    try
+    {
+        auto client = g_clientIdMap.get(msg->cid).value();
+        std::shared_ptr<Room> room = create_room(client->user_id);
+        g_rooms.set(room->getId(), room);
 
-    Response resp;
-    resp.code = 200;
-    resp.message = "create_room success";
-    resp.data = *(room.get());
-    writeResponse(msg, resp);
+        Response resp;
+        resp.code = 200;
+        resp.message = "create_room success";
+        resp.data = *(room.get());
+        writeResponse(msg, resp);
+    }
+    catch (const std::exception &e)
+    {
+        std::cerr << "其他错误: " << e.what() << std::endl;
+    }
 }
 
 void Core::on_auth_success(int cid, std::string token)
@@ -109,14 +121,13 @@ void Core::on_auth_success(int cid, std::string token)
         redis.set(key_user_id, j.dump());
     }
 
-    m_user_id = user_id;
-
     auto client = g_clientIdMap.get(cid);
-    if (client.has_value()) {
+    if (client.has_value())
+    {
         client.value()->user_id = p->id;
+        g_players.set(p->id, p);
         g_uidClientMap.set(p->id, client.value());
     }
-    g_players.set(p->id, p);
 
     // AsyncEventBus::getInstance().asyncPublish<std::string>(EventHandler::EVENT_ONLINE, user_id);
 }
@@ -131,21 +142,10 @@ void Core::do_match_player(std::shared_ptr<Message> msg)
     {
         writeResponse(msg, Response{200, "success, please waitting 30s", MatchPlayerResponse{AUTO_MATCH_DURATION}});
 
-        if (false) {
-            std::shared_ptr<Room> room = create_room(m_user_id);
-            g_rooms.set(room->getId(), room);
-            InitClockTime time;
-            time.preTime = 1;
-            time.readSecondCount = 1;
-            time.moveTime = 10;
-            room->createGoClock(time);
-            room->getGoClock()->start();
-            return;
-        }
+        auto client = g_clientIdMap.get(msg->cid).value();
 
         // 0. 从缓存中找自己的Player
-        auto opt = g_players.get(m_user_id);
-        std::shared_ptr<Player> self = opt.value();
+        std::shared_ptr<Player> self = msg->self;
 
         // 1. 找到对手, 从自动匹配队列中找
         AutoPlayerMatcher &matcher = AutoPlayerMatcher::getInstance();
@@ -157,7 +157,7 @@ void Core::do_match_player(std::shared_ptr<Message> msg)
         }
 
         // 2. 找到对手p后，创建room，把me和p加入到room
-        std::shared_ptr<Room> room = create_room(m_user_id);
+        std::shared_ptr<Room> room = create_room(client->user_id);
 
         int val = gen_random(0, 1);
         if (val == 1)
@@ -176,7 +176,7 @@ void Core::do_match_player(std::shared_ptr<Message> msg)
         }
 
         MatchPlayerRequest req;
-        const nlohmann::json& j = msg->request->data;
+        const nlohmann::json &j = msg->request->data;
         from_json(j, req);
         InitClockTime time;
         time.preTime = req.preTime;
@@ -189,7 +189,115 @@ void Core::do_match_player(std::shared_ptr<Message> msg)
         room->switchRoomState(Room::ROOM_STATE_WAITTING_BLACK_MOVE);
 
         room->pushStartGame();
+    }
+    catch (const std::exception &e)
+    {
+        std::cerr << "其他错误: " << e.what() << std::endl;
+        print_stacktrace();
+    }
+}
 
+bool Core::checkAuth(std::shared_ptr<Message> msg)
+{
+    auto opt = g_clientIdMap.get(msg->cid);
+    if (!opt.has_value())
+    {
+        std::cout << "Core::run() client not exist!" << std::endl;
+        return false;
+    }
+
+    auto client = opt.value();
+    if (!client->user_id.empty())
+    {
+        return true;
+    }
+
+    if (!msg->request->token.empty())
+    {
+        if (!validate_jwt(msg->request->token))
+        {
+            Log::error("Core::run() token is invalid");
+            writeResponse(msg, Response{401, "token is invalid", {}});
+            return 0;
+        }
+        on_auth_success(msg->cid, msg->request->token);
+        return true;
+    }
+
+    if (msg->request->action == "sign_in")
+    {
+        do_sign_in(msg);
+        return false;
+    }
+
+    writeResponse(msg, Response{401, "Insufficient authentication", {}});
+    return false;
+}
+
+void Core::do_online(std::shared_ptr<Message> msg)
+{
+    std::cout << "do_online()" << std::endl;
+}
+
+// 找到某人所在的room
+void findRoomListByPlayer(std::vector<std::shared_ptr<Room>>& list, std::shared_ptr<Player> p) {
+    g_rooms.for_each([&list, p](const auto &pair)
+    { 
+        std::shared_ptr<Room> room = pair.second;
+        if (p->id == room->getBlackPlayer()->id) {
+            list.push_back(room);
+            return;
+        }
+        if (p->id == room->getWhitePlayer()->id) {
+            list.push_back(room);
+            return;
+        }
+        for (auto [pid, player] : room->getGuests()) {
+            if (p->id == pid) {
+                list.push_back(room);
+                return;
+            }
+        }
+    }); 
+}
+
+void Core::do_offline(std::shared_ptr<Message> msg)
+{
+    std::cout << "do_offline()" << std::endl;
+    try
+    {
+        auto opt = g_clientIdMap.get(msg->cid);
+        assert(opt.has_value());
+        std::shared_ptr<Client> client = opt.value();
+
+        std::string user_id = client->user_id;
+        if (!user_id.empty())
+        {
+            // 删除user_id和client的对应关系
+            g_uidClientMap.erase(client->user_id);
+
+            // 清除redis缓存
+            const std::string key_user_id = KEY_USER_PREFIX + user_id;
+            Redis &redis = RedisPool::getInstance().getRedis();
+            redis.del(key_user_id);
+
+            g_players.erase(user_id);
+
+            // 如果再room里，通知room内所有人，某人离线
+            // 向room的消息队列发消息
+            std::vector<std::shared_ptr<Room>> rooms;
+            findRoomListByPlayer(rooms, msg->self);
+
+            for (auto one : rooms) {
+                std::shared_ptr<RoomMessage> rmsg = std::make_shared<RoomMessage>();
+                rmsg->room = g_rooms.get(one->getId()).value();
+                rmsg->reqMsg = msg;
+                one->postRoomMessage(rmsg);
+            }
+        }
+
+        g_clientMap.erase(client->fd);
+        g_clientIdMap.erase(client->id);
     }
     catch (const std::exception &e)
     {
@@ -200,28 +308,22 @@ void Core::do_match_player(std::shared_ptr<Message> msg)
 
 int Core::run(std::shared_ptr<Message> msg)
 {
-    std::string user_id;
-    if (msg->request->token.length() == 0)
+    if (msg->request->action == "online")
     {
-        if (msg->request->action == "sign_in")
-        {
-            do_sign_in(msg);
-        } else {
-            writeResponse(msg, Response{401, "token is invalid", {}});
-        }
-        return 0;
-    } 
-
-    user_id = extract_user_id(msg->request->token);
-    std::cout << "core::run() user_id: " << user_id << std::endl;
-    if (!validate_jwt(msg->request->token))
-    {
-        Log::error("Core::run() token is invalid");
-        writeResponse(msg, Response{401, "token is invalid", {}});
+        do_online(msg);
         return 0;
     }
-    on_auth_success(msg->cid, msg->request->token);
 
+    if (msg->request->action == "offline")
+    {
+        do_offline(msg);
+        return 0;
+    }
+
+    if (!checkAuth(msg))
+    {
+        return 0;
+    }
 
     if (msg->request->action == "get_room_list")
     {
@@ -254,26 +356,17 @@ int Core::run(std::shared_ptr<Message> msg)
     {
     }
 
-
     // 同一个room内的操作，单线程处理
-    else if (msg->request->action == "enter_room"
-        || msg->request->action == "exit_room"
-        || msg->request->action == "get_room_info"
-        || msg->request->action == "move"
-        || msg->request->action == "point_counting"
-        || msg->request->action == "update_point_result"
-        || msg->request->action == "gave_up"
-    )
+    else if (msg->request->action == "enter_room" || msg->request->action == "exit_room" || msg->request->action == "get_room_info" || msg->request->action == "move" || msg->request->action == "point_counting" || msg->request->action == "update_point_result" || msg->request->action == "gave_up")
     {
         std::string room_id = msg->request->data["room_id"].get<std::string>();
         std::shared_ptr<Room> room = g_rooms.get(room_id).value();
 
         std::shared_ptr<RoomMessage> rmsg = std::make_shared<RoomMessage>();
+        rmsg->room = room;
         rmsg->reqMsg = msg;
         room->postRoomMessage(rmsg);
     }
 
     return 0;
 }
-
-

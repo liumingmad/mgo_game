@@ -261,7 +261,7 @@ public:
     void countdown();
 
     void init() {
-        core->room = shared_from_this();
+        // core->room = shared_from_this();
     }
 
     static std::shared_ptr<Room> create(const std::string& id) {

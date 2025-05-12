@@ -126,6 +126,7 @@ void Room::createGoClock(InitClockTime time)
     mGoClock = std::make_shared<GoClock>(time);
     mGoClock->setCallback([&]() {
         std::shared_ptr<RoomMessage> rmsg = std::make_shared<RoomMessage>();
+        rmsg->room = g_rooms.get(getId()).value();
         rmsg->action = "clock_tick";
         rmsg->data = mGoClock;
         postRoomMessage(rmsg);

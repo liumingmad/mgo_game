@@ -22,11 +22,15 @@
 #include <common_utils.h>
 #include <event_handler.h>
 
+// 这三个涉及多线程修改
 ThreadSafeUnorderedMap<std::string, std::shared_ptr<Player>> g_players;
 ThreadSafeUnorderedMap<std::string, std::shared_ptr<Room>> g_rooms;
+ThreadSafeUnorderedMap<std::string, std::shared_ptr<Client>> g_uidClientMap;
+
+// 这两个只在epoll线程修改
 ThreadSafeUnorderedMap<int, std::shared_ptr<Client>> g_clientMap;
 ThreadSafeUnorderedMap<int, std::shared_ptr<Client>> g_clientIdMap;
-ThreadSafeUnorderedMap<std::string, std::shared_ptr<Client>> g_uidClientMap;
+
 ThreadPool g_room_pool;
 EventBus g_EventBus;
 long global_client_id = 0;
@@ -144,14 +148,14 @@ int Server::run(int port)
             struct epoll_event *one = evlist + i;
             int fd = one->data.fd;
             if (listenfd == fd) {
-                handleListenfd(fd, m_epfd);
+                handleListenfd(fd);
             } else if (fd == eventfd) {
-                handleEventfd(m_epfd);
+                handleEventfd();
             } else {
                 if (one->events & EPOLLIN) {
-                    handle_read(g_clientMap.get(fd).value());
+                    handle_read(fd);
                 } else if (one->events & EPOLLOUT) {
-                    handle_write(fd, m_epfd);  // 对客户端继续写未完成的数据
+                    handle_write(fd);  // 对客户端继续写未完成的数据
                 }
             }
         }
@@ -164,7 +168,7 @@ std::string genTimerId(int fd) {
     return TIME_TASK_ID_HEARTBEAT + to_string(fd);
 }
 
-void handleListenfd(int fd, int epfd) {
+void Server::handleListenfd(int fd) {
     struct sockaddr_in clientaddr;
     socklen_t len = sizeof(clientaddr);
     int clientfd = Accept(fd, (struct sockaddr*)&clientaddr, &len);
@@ -174,7 +178,7 @@ void handleListenfd(int fd, int epfd) {
     struct epoll_event ev;
     ev.events = EPOLLIN;
     ev.data.fd = clientfd;
-    Epoll_ctl(epfd, EPOLL_CTL_ADD, clientfd, &ev);
+    Epoll_ctl(m_epfd, EPOLL_CTL_ADD, clientfd, &ev);
     add_client(clientfd, clientaddr);
 }
 
@@ -194,9 +198,9 @@ std::shared_ptr<Request> parseRequest(const std::string& jsonStr) {
     return nullptr;
 }
 
-int Server::handle_read(std::shared_ptr<Client> client) {
+int Server::handle_read(int fd) {
     Log::info("\n\n-----------START-----------------");
-    int fd = client->fd;
+    auto client = g_clientMap.get(fd).value();
 
     char buf[BUF_SIZE];
     bzero(buf, BUF_SIZE);
@@ -239,6 +243,9 @@ int Server::handle_read(std::shared_ptr<Client> client) {
         rb->peek(tmp, len);
         std::shared_ptr<Message> msg = std::make_shared<Message>();
         msg->cid = client->id;
+        if (!(client->user_id.empty())) {
+            msg->self = g_players.get(client->user_id).value();
+        }
         msg->header = header;
         msg->request = parseRequest(std::string(tmp+HEADER_SIZE, header->data_length));
         client->queue.enqueue(msg);
@@ -265,22 +272,22 @@ void Server::handle_message(std::shared_ptr<Client> client) {
     while (!queue.empty()) {
         std::shared_ptr<Message> msg;
         if (queue.dequeue(msg)) {
-            if (msg->header->command == ProtocolHeader::HEADER_COMMAND_HEART) {
+            if (msg->header && msg->header->command == ProtocolHeader::HEADER_COMMAND_HEART) {
                 response_heartbeat(msg->cid);
-            } else {
-                client->core->run(msg);
+                continue;
             }
+            client->core->run(msg);
         }
     }
 }
 
-void handleHeartBeatTimerout(int fd, int epfd) {
-    Epoll_ctl(epfd, EPOLL_CTL_DEL, fd, nullptr);
+void Server::handleHeartBeatTimerout(int fd) {
+    Epoll_ctl(m_epfd, EPOLL_CTL_DEL, fd, nullptr);
     Close(fd);
     remove_client(fd);
 }
 
-void handle_write(int fd, int epfd)
+void Server::handle_write(int fd)
 {
     auto opt = g_clientMap.get(fd);
     assert(opt.has_value());
@@ -297,20 +304,20 @@ void handle_write(int fd, int epfd)
             epoll_event ev{};
             ev.events = EPOLLIN;
             ev.data.fd = fd;
-            epoll_ctl(epfd, EPOLL_CTL_MOD, fd, &ev);
+            epoll_ctl(m_epfd, EPOLL_CTL_MOD, fd, &ev);
         }
     }
     else if (n == -1 && (errno != EAGAIN && errno != EWOULDBLOCK))
     {
         // 真正的错误（如连接断开）
         perror("write failed");
-        Epoll_ctl(epfd, EPOLL_CTL_DEL, fd, nullptr);
+        Epoll_ctl(m_epfd, EPOLL_CTL_DEL, fd, nullptr);
         close(fd);
         remove_client(fd);
     }
 }
 
-void schedule_write(int fd, const std::string &data, int epfd)
+void Server::schedule_write(int fd, const std::string &data)
 {
     auto opt = g_clientMap.get(fd);
     assert(opt.has_value());
@@ -319,7 +326,7 @@ void schedule_write(int fd, const std::string &data, int epfd)
     client->pendingWriteBuffer += data; // 缓存数据
 
     // 尝试立即写
-    handle_write(fd, epfd);
+    handle_write(fd);
 
     // 如果还有剩余，监听 EPOLLOUT
     if (!client->pendingWriteBuffer.empty())
@@ -327,50 +334,57 @@ void schedule_write(int fd, const std::string &data, int epfd)
         epoll_event ev{};
         ev.events = EPOLLIN | EPOLLOUT;
         ev.data.fd = fd;
-        epoll_ctl(epfd, EPOLL_CTL_MOD, fd, &ev);
+        epoll_ctl(m_epfd, EPOLL_CTL_MOD, fd, &ev);
     }
 }
 
-int add_client(int fd, struct sockaddr_in addr) {
+int Server::add_client(int fd, struct sockaddr_in addr) {
     std::shared_ptr<Client> client = std::make_shared<Client>();
     std::cout << "add client id " << client->id << std::endl;
-
     client->fd = fd;
     client->clientaddr = addr;
     client->activeTimestamp = get_now_milliseconds();
     g_clientMap.set(fd, client);
     g_clientIdMap.set(client->id, client);
+
+    auto req = std::make_shared<Request>();
+    req->action = "online";
+    std::shared_ptr<Message> msg = std::make_shared<Message>();
+    msg->cid = client->id;
+    if (!(client->user_id.empty())) {
+        msg->self = g_players.get(client->user_id).value();
+    }
+    msg->request = req;
+    client->queue.enqueue(msg);
+    m_pool.submit([this, client]() {
+        this->handle_message(client);
+    });
 }
 
-int remove_client(int fd) {
+// 上线/离线也做成消息，发送到client队列处理
+int Server::remove_client(int fd) {
     auto opt = g_clientMap.get(fd);
     assert(opt.has_value());
     std::shared_ptr<Client> client = opt.value();
     std::cout << "remove client fd " << fd << ", id "<< client->id << std::endl;
-
-    std::string user_id = client->user_id;
-    if (!user_id.empty()) {
-        // 删除user_id和client的对应关系
-        g_uidClientMap.erase(client->user_id);
-
-        // 清除redis缓存
-        const std::string key_user_id = KEY_USER_PREFIX + user_id;
-        Redis &redis = RedisPool::getInstance().getRedis();
-        redis.del(key_user_id);
-
-        // auto it = g_players.find(user_id);
-        // if (it != g_players.end()) {
-        //     it->second.online = false;
-        // }
+    
+    auto req = std::make_shared<Request>();
+    req->action = "offline";
+    std::shared_ptr<Message> msg = std::make_shared<Message>();
+    msg->cid = client->id;
+    if (!(client->user_id.empty())) {
+        msg->self = g_players.get(client->user_id).value();
     }
-
-    g_clientMap.erase(client->fd);
-    g_clientIdMap.erase(client->id);
+    msg->request = req;
+    client->queue.enqueue(msg);
+    m_pool.submit([this, client]() {
+        this->handle_message(client);
+    });
 
     return 0;
 }
 
-void handleEventfd(int epfd)
+void Server::handleEventfd()
 {
     EventHandler& handler = EventHandler::getInstance();
     auto& queue = handler.getConcurrentQueue();
@@ -387,14 +401,14 @@ void handleEventfd(int epfd)
         switch (msg->type)
         {
         case EVMESSAGE_TYPE_HEARTBEAT_TIMEOUT:
-            handleHeartBeatTimerout(fd, epfd);
+            handleHeartBeatTimerout(fd);
             break;
 
         case EVMESSAGE_TYPE_SERVER_PUSH: {
             auto data = std::any_cast<std::shared_ptr<std::string>>(msg->data);
             std::cout << "EVMESSAGE_TYPE_SERVER_PUSH fd=" << fd << ", cid=" << client.value()->id << std::endl;
             std::cout << (data->c_str()+HEADER_SIZE) << std::endl;
-            schedule_write(fd, *data, epfd);
+            schedule_write(fd, *data);
 
             Log::info("\n\n-----------END-----------------");
             break;

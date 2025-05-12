@@ -35,41 +35,43 @@ int RoomCore::run(std::shared_ptr<RoomMessage> roomMessage)
     {
         do_clock_tick(roomMessage);
     }
+    else if (action == "offline")
+    {
+        do_offline(roomMessage);
+    }
     else if (action == "enter_room")
     {
-        do_enter_room(msg);
+        do_enter_room(roomMessage);
     }
     else if (action == "exit_room")
     {
-        do_exit_room(msg);
+        do_exit_room(roomMessage);
     }
     else if (action == "get_room_info")
     {
-        do_get_room_info(msg);
+        do_get_room_info(roomMessage);
     }
     else if (action == "move")
     {
-        do_waitting_move(msg);
+        do_waitting_move(roomMessage);
     }
     else if (action == "point_counting") // 申请点目
     {
-        do_point_counting(msg);
+        do_point_counting(roomMessage);
     }
     else if (action == "update_point_result") // 确认点目结果
     {
-        do_point_counting_result(msg);
+        do_point_counting_result(roomMessage);
     }
     else if (action == "gave_up") // 认输
     {
-        do_gave_up(msg);
+        do_gave_up(roomMessage);
     }
 }
 
 void RoomCore::do_clock_tick(std::shared_ptr<RoomMessage> msg)
 {
-    auto sharedRoom = room.lock();
-    assert(sharedRoom);
-
+    auto room = msg->room;
     std::shared_ptr<GoClock> goClock = std::any_cast<std::shared_ptr<GoClock>>(msg->data);
     std::shared_ptr<RClock> bc = goClock->getBClock();
     std::shared_ptr<RClock> wc = goClock->getWClock();
@@ -79,46 +81,48 @@ void RoomCore::do_clock_tick(std::shared_ptr<RoomMessage> msg)
     bool whiteTimeout = wc->getReadSecondCount() <= 0;
     if (blackTimeout || whiteTimeout)
     {
-        sharedRoom->switchRoomState(Room::ROOM_STATE_GAME_OVER);
+        room->switchRoomState(Room::ROOM_STATE_GAME_OVER);
 
         std::string playerId;
         if (blackTimeout)
         {
-            playerId = sharedRoom->getBlackPlayer()->id;
+            playerId = room->getBlackPlayer()->id;
         }
         else
         {
-            playerId = sharedRoom->getWhitePlayer()->id;
+            playerId = room->getWhitePlayer()->id;
         }
         nlohmann::json j = {
-            {"room_id", sharedRoom->getId()},
+            {"room_id", room->getId()},
             {"player_id", playerId},
         };
         std::shared_ptr<PushMessage> pmsg = std::make_shared<PushMessage>("move_timeout", j);
-        sharedRoom->pushMessageToAll(pmsg);
+        room->pushMessageToAll(pmsg);
     }
     else
     {
         // push clock_tick
         nlohmann::json j = {
-            {"room_id", sharedRoom->getId()},
+            {"room_id", room->getId()},
             {"b_clock", {{"preTime", bc->getPreTime()}, {"readSecondCount", bc->getReadSecondCount()}, {"moveTime", bc->getMoveTime()}}},
             {"w_clock", {{"preTime", wc->getPreTime()}, {"readSecondCount", wc->getReadSecondCount()}, {"moveTime", wc->getMoveTime()}}},
         };
         std::shared_ptr<PushMessage> pmsg = std::make_shared<PushMessage>("clock_tick", j);
-        sharedRoom->pushMessageToAll(pmsg);
+        room->pushMessageToAll(pmsg);
     }
 }
 
-void RoomCore::do_enter_room(std::shared_ptr<Message> msg)
+void RoomCore::do_offline(std::shared_ptr<RoomMessage> msg) {
+    // 通知某人离线
+}
+
+void RoomCore::do_enter_room(std::shared_ptr<RoomMessage> roommsg)
 {
     try
     {
-        std::string room_id = msg->request->data["room_id"].get<std::string>();
-        std::shared_ptr<Room> room = g_rooms.get(room_id).value();
-
-        std::string user_id = extract_user_id(msg->request->token);
-        std::shared_ptr<Player> p = g_players.get(user_id).value();
+        auto msg = roommsg->reqMsg;
+        auto room = roommsg->room;
+        std::shared_ptr<Player> p = msg->self;
 
         RoomRole role = room->getRole(p);
         if (role != RoomRole::UNKNOW)
@@ -136,15 +140,13 @@ void RoomCore::do_enter_room(std::shared_ptr<Message> msg)
     }
 }
 
-void RoomCore::do_exit_room(std::shared_ptr<Message> msg)
+void RoomCore::do_exit_room(std::shared_ptr<RoomMessage> roommsg)
 {
     try
     {
-        std::string room_id = msg->request->data["room_id"].get<std::string>();
-        std::shared_ptr<Room> room = g_rooms.get(room_id).value();
-
-        std::string user_id = extract_user_id(msg->request->token);
-        std::shared_ptr<Player> p = g_players.get(user_id).value();
+        auto msg = roommsg->reqMsg;
+        auto room = roommsg->room;
+        std::shared_ptr<Player> p = msg->self;
 
         // 如果是棋手，不允许退出room, 只能通过认输退出
         RoomRole role = room->getRole(p);
@@ -163,12 +165,12 @@ void RoomCore::do_exit_room(std::shared_ptr<Message> msg)
     }
 }
 
-void RoomCore::do_get_room_info(std::shared_ptr<Message> msg)
+void RoomCore::do_get_room_info(std::shared_ptr<RoomMessage> roommsg)
 {
     try
     {
-        std::string room_id = msg->request->data["room_id"].get<std::string>();
-        std::shared_ptr<Room> room = g_rooms.get(room_id).value();
+        auto msg = roommsg->reqMsg;
+        auto room = roommsg->room;
         writeResponse(msg, Response{200, "success", *room.get()});
     }
     catch (const std::exception &e)
@@ -199,17 +201,14 @@ bool should_move(const std::shared_ptr<Room> room, const std::string &user_id)
     return should_move;
 }
 
-void RoomCore::do_point_counting_result(std::shared_ptr<Message> msg)
+void RoomCore::do_point_counting_result(std::shared_ptr<RoomMessage> roommsg)
 {
     try
     {
         // 1. 通过room id获取room
-        std::string room_id = msg->request->data["room_id"].get<std::string>();
-        std::shared_ptr<Room> room = g_rooms.get(room_id).value();
-
-        std::string user_id = extract_user_id(msg->request->token);
-        std::shared_ptr<Player> self = g_players.get(user_id).value();
-
+        auto msg = roommsg->reqMsg;
+        auto room = roommsg->room;
+        std::shared_ptr<Player> self = msg->self;
         bool is_accept = msg->request->data["state"];
 
         // 是否是下棋的人
@@ -262,15 +261,14 @@ void RoomCore::do_point_counting_result(std::shared_ptr<Message> msg)
     }
 }
 
-void RoomCore::do_point_counting(std::shared_ptr<Message> msg)
+void RoomCore::do_point_counting(std::shared_ptr<RoomMessage> roommsg)
 {
     try
     {
-
         // 1. 通过room id获取room
-        std::string room_id = msg->request->data["room_id"].get<std::string>();
-        std::shared_ptr<Room> room = g_rooms.get(room_id).value();
-        std::string user_id = extract_user_id(msg->request->token);
+        auto msg = roommsg->reqMsg;
+        auto room = roommsg->room;
+        std::string user_id = msg->self->id;
 
         // 2. 检查room状态，是否有人超时，或离线
         int state = room->getState();
@@ -319,15 +317,13 @@ void RoomCore::do_point_counting(std::shared_ptr<Message> msg)
     }
 }
 
-void RoomCore::do_waitting_move(std::shared_ptr<Message> msg)
+void RoomCore::do_waitting_move(std::shared_ptr<RoomMessage> roommsg)
 {
     try
     {
-
-        // 1. 通过room id获取room
-        std::string room_id = msg->request->data["room_id"].get<std::string>();
-        std::shared_ptr<Room> room = g_rooms.get(room_id).value();
-        std::string user_id = extract_user_id(msg->request->token);
+        auto msg = roommsg->reqMsg;
+        auto room = roommsg->room;
+        std::string user_id = msg->self->id;
 
         // 2. 检查room状态，是否有人超时，或离线
         int state = room->getState();
@@ -379,14 +375,13 @@ void RoomCore::do_waitting_move(std::shared_ptr<Message> msg)
     }
 }
 
-void RoomCore::do_gave_up(std::shared_ptr<Message> msg)
+void RoomCore::do_gave_up(std::shared_ptr<RoomMessage> roommsg)
 {
     try
     {
-        std::string room_id = msg->request->data["room_id"].get<std::string>();
-        std::shared_ptr<Room> room = g_rooms.get(room_id).value();
-
-        std::string user_id = extract_user_id(msg->request->token);
+        auto msg = roommsg->reqMsg;
+        auto room = roommsg->room;
+        std::string user_id = msg->self->id;
 
         // 检查是否轮到当前用户落子
         if (!should_move(room, user_id))
