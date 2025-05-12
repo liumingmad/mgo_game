@@ -178,6 +178,21 @@ enum RoomRole
     UNKNOW
 };
 
+class ChatMessage {
+public:
+    std::string uid;
+    std::string name;
+    std::string text;
+
+    ChatMessage(std::string uid, std::string name, std::string text) : uid(uid), name(name), text(text) 
+    {}
+    ~ChatMessage() = default;
+    ChatMessage(ChatMessage &one) = default;
+    ChatMessage &operator=(const ChatMessage &one) = default;
+    ChatMessage(ChatMessage &&) = default;
+    ChatMessage &operator=(ChatMessage &&) = default;
+};
+
 class Room : public std::enable_shared_from_this<Room>
 {
 private:
@@ -191,6 +206,7 @@ private:
     InitClockTime mInitClockTime;
     std::shared_ptr<GoClock> mGoClock;
     uint8_t mPointCountingState = COUNTING_STAT_INIT;
+    std::vector<std::shared_ptr<ChatMessage>> mChatMessages;
 
 public:
     // 当执行queue中Message的过程中，不能执行队列中下一个
@@ -198,7 +214,6 @@ public:
     SafeQueue<std::shared_ptr<RoomMessage>> queue;
     std::shared_ptr<RoomCore> core;
     void postRoomMessage(std::shared_ptr<RoomMessage> msg);
-    void handleRoomMessage(std::shared_ptr<RoomMessage> msg);
 
     std::string getId() const;
     int getState() const;
@@ -209,6 +224,7 @@ public:
     std::shared_ptr<Player> getBlackPlayer() const;
     std::shared_ptr<Player> getWhitePlayer() const;
     RoomRole getRole(std::shared_ptr<Player>) const;
+    std::vector<std::shared_ptr<ChatMessage>>& getChatMessages();
     bool is_guest(std::shared_ptr<Player> p) const;
     bool is_player(std::shared_ptr<Player> p) const;
     bool is_counting_selecting(std::shared_ptr<Player> p) const;
@@ -234,7 +250,7 @@ public:
     void pushGameResult() const;
     void pushOffline(std::string player_id) const;
     void pushOnline(std::string player_id) const;
-
+    void pushChatMessage(std::shared_ptr<ChatMessage> msg) const;
 
     // 数目的状态
     // 每个人有三种状态：argee/reject/selecting

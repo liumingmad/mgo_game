@@ -10,11 +10,10 @@
 
 struct Request
 {
-    std::string token;
     std::string action;
     nlohmann::json data;
 };
-NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(Request, token, action, data)
+NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(Request, action, data)
 
 struct Response
 {
@@ -28,6 +27,7 @@ NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(Response, code, message, data)
 struct SignInResponse
 {
     std::string token;
+    std::string tcpToken;
 };
 NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(SignInResponse, token)
 

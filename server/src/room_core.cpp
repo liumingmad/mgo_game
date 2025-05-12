@@ -47,6 +47,10 @@ int RoomCore::run(std::shared_ptr<RoomMessage> roomMessage)
     {
         do_offline(roomMessage);
     }
+    else if (action == "chat")
+    {
+        do_chat(roomMessage);
+    }
     else if (action == "enter_room")
     {
         do_enter_room(roomMessage);
@@ -482,4 +486,18 @@ void RoomCore::do_offline(std::shared_ptr<RoomMessage> roommsg)
 
     // 通知room内其他人，某人离线
     room->pushOffline(user_id);
+}
+
+void RoomCore::do_chat(std::shared_ptr<RoomMessage> roommsg) 
+{
+    auto msg = roommsg->reqMsg;
+    auto room = roommsg->room;
+    std::shared_ptr<Player> p = msg->self;
+    std::string text = msg->request->data["text"].get<std::string>();
+
+    auto one = std::make_shared<ChatMessage>(p->id, p->name, text); 
+    room->getChatMessages().push_back(one);
+
+    // push
+    room->pushChatMessage(one);
 }

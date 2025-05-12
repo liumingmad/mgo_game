@@ -222,15 +222,17 @@ bool Core::checkAuth(std::shared_ptr<Message> msg)
         return true;
     }
 
-    if (!msg->request->token.empty())
+    std::string token = msg->request->data["tcpToken"];
+
+    if (!token.empty())
     {
-        if (!validate_jwt(msg->request->token))
+        if (!validate_jwt(token))
         {
             Log::error("Core::run() token is invalid");
             writeResponse(msg, Response{401, "token is invalid", {}});
             return 0;
         }
-        on_auth_success(msg->cid, msg->request->token);
+        on_auth_success(msg->cid, token);
         return true;
     }
 

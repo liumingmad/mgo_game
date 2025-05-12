@@ -119,7 +119,9 @@ std::shared_ptr<GoClock> Room::getGoClock() const {
     return mGoClock;
 }
 
-
+std::vector<std::shared_ptr<ChatMessage>>& Room::getChatMessages() {
+    return mChatMessages;
+}
 
 void Room::createGoClock(InitClockTime time)
 {
@@ -209,6 +211,16 @@ void Room::pushOnline(std::string player_id) const {
 
 }
 
+void Room::pushChatMessage(std::shared_ptr<ChatMessage> msg) const {
+    nlohmann::json j = {
+        {"room_id", getId()},
+        {"player_id", msg->uid},
+        {"text", msg->text},
+    };
+    std::shared_ptr<PushMessage> pmsg = std::make_shared<PushMessage>("chat_message", j);
+    pushMessageToAll(pmsg);
+}
+
 // 所有触发room state改变的事件，需要通知room内所有人
 // 0. 匹配对手成功
 // 1. 黑/白棋落子
@@ -237,10 +249,6 @@ void Room::markBlackWins() {
 void Room::markWhiteWins() {
     getGoClock()->stop();
     switchRoomState(Room::ROOM_STATE_GAME_OVER);
-}
-
-
-void Room::handleRoomMessage(std::shared_ptr<RoomMessage> msg) {
 }
 
 void Room::postRoomMessage(std::shared_ptr<RoomMessage> msg) {

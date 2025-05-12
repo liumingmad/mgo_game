@@ -28,7 +28,9 @@ ThreadSafeUnorderedMap<std::string, std::shared_ptr<Room>> g_rooms;
 ThreadSafeUnorderedMap<std::string, std::shared_ptr<Client>> g_uidClientMap;
 
 // 这两个只在epoll线程修改
+// <fd, client>
 ThreadSafeUnorderedMap<int, std::shared_ptr<Client>> g_clientMap;
+// <cid, client>
 ThreadSafeUnorderedMap<int, std::shared_ptr<Client>> g_clientIdMap;
 
 ThreadPool g_room_pool;
