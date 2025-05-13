@@ -26,7 +26,7 @@ void Core::do_sign_in(std::shared_ptr<Message> msg)
         if (!user)
         {
             writeResponse(msg, Response{400, "sign_in fail, token invalid", {}});
-            Log::info("Core::run() sign_in fail, token invalid");
+            LOG_INFO("Core::run() sign_in fail, token invalid");
             return;
         }
         // 创建token
@@ -228,7 +228,7 @@ bool Core::checkAuth(std::shared_ptr<Message> msg)
     {
         if (!validate_jwt(token))
         {
-            Log::error("Core::run() token is invalid");
+            LOG_ERROR("Core::run() token is invalid");
             writeResponse(msg, Response{401, "token is invalid", {}});
             return 0;
         }

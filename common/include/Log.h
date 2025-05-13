@@ -1,16 +1,14 @@
 #ifndef LOG_H
 #define LOG_H
 
-#include <iostream>
+#include <spdlog/spdlog.h>
+#include <spdlog/sinks/rotating_file_sink.h>
+#include <spdlog/async.h>
 
-class Log
-{
-private:
-    Log();
-    ~Log();
-public:
-    static void info(std::string message);
-    static void error(std::string message);
-};
+#define LOG_INFO(...)    SPDLOG_INFO(__VA_ARGS__)
+#define LOG_DEBUG(...)   SPDLOG_DEBUG(__VA_ARGS__)
+#define LOG_ERROR(...)   SPDLOG_ERROR(__VA_ARGS__)
+
+void init_async_logger(bool to_console);
 
 #endif // LOG_H

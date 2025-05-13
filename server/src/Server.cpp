@@ -63,7 +63,8 @@ long global_client_id = 0;
 int Server::init() {
     // 忽略 SIGPIPE，防止进程因 write 出错而崩溃
     // 忽略这个信号后，write时，会返回-1，errno == EPIPE
-    signal(SIGPIPE, SIG_IGN);
+    // 在service guard中处理
+    // signal(SIGPIPE, SIG_IGN);
 
     // 初始化数据库连接池
     DBConnectionPool::getInstance()->initPool(
@@ -111,7 +112,7 @@ int Server::run(int port)
 {
     int listenfd = Socket(AF_INET, SOCK_STREAM, 0);
     set_nonblocking(listenfd);
-    std::cout << "listen fd=" << listenfd << std::endl; 
+    LOG_INFO("listen fd={}", listenfd);
 
 
     int opt = 1;
@@ -201,7 +202,11 @@ std::shared_ptr<Request> parseRequest(const std::string& jsonStr) {
 }
 
 int Server::handle_read(int fd) {
-    Log::info("\n\n-----------START-----------------");
+    LOG_INFO("\n\n-----------START-----------------");
+
+    // int* p = nullptr;
+    // *p = 1; // 故意 SIGSEGV
+
     auto client = g_clientMap.get(fd).value();
 
     char buf[BUF_SIZE];
@@ -418,7 +423,7 @@ void Server::handleEventfd()
             std::cout << (data->c_str()+HEADER_SIZE) << std::endl;
             schedule_write(fd, *data);
 
-            Log::info("\n\n-----------END-----------------");
+            LOG_INFO("\n\n-----------END-----------------");
             break;
         }
 

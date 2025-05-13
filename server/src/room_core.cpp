@@ -29,7 +29,7 @@ int RoomCore::run(std::shared_ptr<RoomMessage> roomMessage)
         action = roomMessage->action;
     }
 
-    Log::info(action);
+    LOG_INFO(action);
 
     if (action == "clock_tick") // 时钟滴答
     {

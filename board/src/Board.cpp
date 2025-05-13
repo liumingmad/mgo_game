@@ -70,7 +70,7 @@ int Board::get(int x, int y) {
 int Board::move(int y, int x, char player) {
     if (check(x, y, player) == 0) return 0;
     if (isSuicide(x, y, player, *(this->current->data))) {
-        Log::error("Error: move() is suicide.");
+        LOG_ERROR("Error: move() is suicide.");
         return 0;
     }
 

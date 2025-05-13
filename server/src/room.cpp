@@ -231,7 +231,6 @@ void Room::pushChatMessage(std::shared_ptr<ChatMessage> msg) const {
 // 5. 接受或拒绝点目结果
 // 6. 认输
 
-
 void Room::switchRoomState(int newState)
 {
     mState = newState;
@@ -250,6 +249,12 @@ void Room::markBlackWins() {
 void Room::markWhiteWins() {
     getGoClock()->stop();
     switchRoomState(Room::ROOM_STATE_GAME_OVER);
+}
+
+void Room::saveGameResult() {
+    // 保存棋谱
+    // 更新战绩
+    // 更新段位
 }
 
 void Room::postRoomMessage(std::shared_ptr<RoomMessage> msg) {

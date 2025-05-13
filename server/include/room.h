@@ -242,6 +242,8 @@ public:
     void markBlackWins();
     void markWhiteWins();
 
+    // 保存对局结果
+    void saveGameResult();
 
     void start();
 
