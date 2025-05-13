@@ -349,6 +349,12 @@ int Server::add_client(int fd, struct sockaddr_in addr) {
     g_clientMap.set(fd, client);
     g_clientIdMap.set(client->id, client);
 
+    // 连接上来，啥也不发的的人
+    TimerManager::instance().addTask(genTimerId(fd), 30000, [fd](){
+        auto msg = std::make_shared<EVMessage>(fd, EVMESSAGE_TYPE_HEARTBEAT_TIMEOUT, nullptr);
+        EventHandler::getInstance().post(msg);
+    });
+
     auto req = std::make_shared<Request>();
     req->action = "online";
     std::shared_ptr<Message> msg = std::make_shared<Message>();

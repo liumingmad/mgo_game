@@ -21,6 +21,7 @@ public:
     int run(std::shared_ptr<RoomMessage> msg);
     
     void do_offline_timeout(std::shared_ptr<RoomMessage> roommsg);
+    void  do_get_chat_list(std::shared_ptr<RoomMessage> roommsg);
     void do_chat(std::shared_ptr<RoomMessage> msg);
     void do_online(std::shared_ptr<RoomMessage> msg);
     void do_offline(std::shared_ptr<RoomMessage> msg);

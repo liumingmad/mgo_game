@@ -180,18 +180,20 @@ enum RoomRole
 
 class ChatMessage {
 public:
+    std::string room_id;
     std::string uid;
     std::string name;
     std::string text;
 
-    ChatMessage(std::string uid, std::string name, std::string text) : uid(uid), name(name), text(text) 
+    ChatMessage(std::string roomId, std::string uid, std::string name, std::string text) : room_id(roomId), uid(uid), name(name), text(text) 
     {}
     ~ChatMessage() = default;
-    ChatMessage(ChatMessage &one) = default;
+    ChatMessage(const ChatMessage &one) = default;
     ChatMessage &operator=(const ChatMessage &one) = default;
     ChatMessage(ChatMessage &&) = default;
     ChatMessage &operator=(ChatMessage &&) = default;
 };
+NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(ChatMessage, room_id, uid, name, text)
 
 class Room : public std::enable_shared_from_this<Room>
 {

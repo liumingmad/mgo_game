@@ -47,6 +47,10 @@ int RoomCore::run(std::shared_ptr<RoomMessage> roomMessage)
     {
         do_offline(roomMessage);
     }
+    else if (action == "get_chat_list")
+    {
+        do_get_chat_list(roomMessage);
+    }
     else if (action == "chat")
     {
         do_chat(roomMessage);
@@ -93,9 +97,12 @@ void RoomCore::do_clock_tick(std::shared_ptr<RoomMessage> msg)
     bool whiteTimeout = wc->getReadSecondCount() <= 0;
     if (blackTimeout || whiteTimeout)
     {
-        if (blackTimeout) {
+        if (blackTimeout)
+        {
             room->markBlackWins();
-        } else {
+        }
+        else
+        {
             room->markWhiteWins();
         }
 
@@ -127,7 +134,6 @@ void RoomCore::do_clock_tick(std::shared_ptr<RoomMessage> msg)
         room->pushMessageToAll(pmsg);
     }
 }
-
 
 void RoomCore::do_enter_room(std::shared_ptr<RoomMessage> roommsg)
 {
@@ -403,9 +409,12 @@ void RoomCore::do_gave_up(std::shared_ptr<RoomMessage> roommsg)
             return;
         }
 
-        if (user_id == room->getBlackPlayer()->id) {
+        if (user_id == room->getBlackPlayer()->id)
+        {
             room->markWhiteWins();
-        } else if (user_id == room->getWhitePlayer()->id) {
+        }
+        else if (user_id == room->getWhitePlayer()->id)
+        {
             room->markBlackWins();
         }
 
@@ -418,86 +427,147 @@ void RoomCore::do_gave_up(std::shared_ptr<RoomMessage> roommsg)
     }
 }
 
-std::string getOfflineTaskId(std::string roomId) {
+std::string getOfflineTaskId(std::string roomId)
+{
     return "OFFLINE_TIMEOUT_" + roomId;
 }
 
-void RoomCore::do_online(std::shared_ptr<RoomMessage> roommsg) 
+void RoomCore::do_online(std::shared_ptr<RoomMessage> roommsg)
 {
-    auto room = roommsg->room;
-    auto p = std::any_cast<std::shared_ptr<Player>>(roommsg->data);
+    try
+    {
+        auto room = roommsg->room;
+        auto p = std::any_cast<std::shared_ptr<Player>>(roommsg->data);
 
-    // p 是新创建的对象，所以要把room里保存的旧对象拷贝到新对象里
-    // 调用赋值构造
-    p = room->getBlackPlayer();
-    p->state = PLAYER_ONLINE;
+        // p 是新创建的对象，所以要把room里保存的旧对象拷贝到新对象里
+        // 调用赋值构造
+        p = room->getBlackPlayer();
+        p->state = PLAYER_ONLINE;
 
-    // 取消超时检查
-    std::string taskId = getOfflineTaskId(room->getId());
-    TimerManager::instance().removeTask(taskId);
+        // 取消超时检查
+        std::string taskId = getOfflineTaskId(room->getId());
+        TimerManager::instance().removeTask(taskId);
 
-    // 打开go clock
-    room->getGoClock()->start();
+        // 打开go clock
+        room->getGoClock()->start();
 
-    // 通知room内其他人，自己上线
-    room->pushOnline(p->id);
-} 
-
-void RoomCore::do_offline_timeout(std::shared_ptr<RoomMessage> roommsg) {
-    auto msg = roommsg->reqMsg;
-    auto room = roommsg->room;
-    std::string user_id = msg->self->id;
-
-    if (user_id == room->getBlackPlayer()->id) {
-        room->markBlackWins(); 
-    } else if (user_id == room->getBlackPlayer()->id) {
-        room->markWhiteWins(); 
+        // 通知room内其他人，自己上线
+        room->pushOnline(p->id);
     }
-    room->pushGameResult();
+    catch (const std::exception &e)
+    {
+        std::cerr << "其他错误: " << e.what() << std::endl;
+    }
 }
 
-void RoomCore::do_offline(std::shared_ptr<RoomMessage> roommsg) 
+void RoomCore::do_offline_timeout(std::shared_ptr<RoomMessage> roommsg)
 {
-    auto msg = roommsg->reqMsg;
-    auto room = roommsg->room;
-    std::string user_id = msg->self->id;
+    try
+    {
+        auto msg = roommsg->reqMsg;
+        auto room = roommsg->room;
+        std::string user_id = msg->self->id;
 
-    if (room->is_player(msg->self)) {
-        // mark offline
-        msg->self->state = PLAYER_WAITTING_REBACK;
+        if (user_id == room->getBlackPlayer()->id)
+        {
+            room->markBlackWins();
+        }
+        else if (user_id == room->getBlackPlayer()->id)
+        {
+            room->markWhiteWins();
+        }
+        room->pushGameResult();
+    }
+    catch (const std::exception &e)
+    {
+        std::cerr << "其他错误: " << e.what() << std::endl;
+    }
+}
 
-        // pause go clock
-        room->getGoClock()->stop();
+void RoomCore::do_offline(std::shared_ptr<RoomMessage> roommsg)
+{
+    try
+    {
+        auto msg = roommsg->reqMsg;
+        auto room = roommsg->room;
+        std::string user_id = msg->self->id;
 
-        // 开启定时器，如果180s，没回来，则判负
-        std::string taskId = getOfflineTaskId(room->getId());
-        TimerManager::instance().addTask(taskId, 180*1000, [&room, &user_id]() {
+        if (room->is_player(msg->self))
+        {
+            // mark offline
+            msg->self->state = PLAYER_WAITTING_REBACK;
+
+            // pause go clock
+            room->getGoClock()->stop();
+
+            // 开启定时器，如果180s，没回来，则判负
+            std::string taskId = getOfflineTaskId(room->getId());
+            TimerManager::instance().addTask(taskId, 180 * 1000, [&room, &user_id]()
+                                             {
             // 得用发消息的方式，否则又并发了
             std::shared_ptr<RoomMessage> rmsg = std::make_shared<RoomMessage>();
             rmsg->room = room;
             rmsg->action = "offline_timeout";
             rmsg->data = user_id;
-            room->postRoomMessage(rmsg);
-        });
+            room->postRoomMessage(rmsg); });
+        }
+        else
+        {
+            room->removeGuest(msg->self);
+        }
 
-    } else {
-        room->removeGuest(msg->self);
+        // 通知room内其他人，某人离线
+        room->pushOffline(user_id);
     }
-
-    // 通知room内其他人，某人离线
-    room->pushOffline(user_id);
+    catch (const std::exception &e)
+    {
+        std::cerr << "其他错误: " << e.what() << std::endl;
+    }
 }
 
-void RoomCore::do_chat(std::shared_ptr<RoomMessage> roommsg) 
+void RoomCore::do_chat(std::shared_ptr<RoomMessage> roommsg)
 {
-    auto msg = roommsg->reqMsg;
-    auto room = roommsg->room;
-    std::shared_ptr<Player> p = msg->self;
-    std::string text = msg->request->data["text"].get<std::string>();
+    try
+    {
+        auto msg = roommsg->reqMsg;
+        auto room = roommsg->room;
+        std::shared_ptr<Player> p = msg->self;
+        std::string text = msg->request->data["text"].get<std::string>();
 
-    auto one = std::make_shared<ChatMessage>(p->id, p->name, text); 
-    room->getChatMessages().push_back(one);
+        auto one = std::make_shared<ChatMessage>(room->getId(), p->id, p->name, text);
+        room->getChatMessages().push_back(one);
 
-    // push
-    room->pushChatMessage(one);
+        writeResponse(msg, Response{200, "chat success", {}});
+        // push
+        room->pushChatMessage(one);
+    }
+    catch (const std::exception &e)
+    {
+        std::cerr << "其他错误: " << e.what() << std::endl;
+    }
+}
+
+void RoomCore::do_get_chat_list(std::shared_ptr<RoomMessage> roommsg)
+{
+    try
+    {
+        auto msg = roommsg->reqMsg;
+        auto room = roommsg->room;
+
+        Response resp;
+        resp.code = 200;
+        resp.message = "get_chat_list success";
+
+        std::vector<ChatMessage> messages;
+        for (auto one : room->getChatMessages()) {
+            messages.push_back(*one);
+        }
+        resp.data = messages;
+
+        writeResponse(msg, resp);
+    }
+    catch (const std::exception &e)
+    {
+        std::cerr << "其他错误: " << e.what() << std::endl;
+    }
 }

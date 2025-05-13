@@ -388,7 +388,11 @@ int Core::run(std::shared_ptr<Message> msg)
     }
 
     // 同一个room内的操作，单线程处理
-    else if (msg->request->action == "enter_room" || msg->request->action == "exit_room" || msg->request->action == "get_room_info" || msg->request->action == "move" || msg->request->action == "point_counting" || msg->request->action == "update_point_result" || msg->request->action == "gave_up")
+    else if (msg->request->action == "enter_room" 
+        || msg->request->action == "exit_room" 
+        || msg->request->action == "get_chat_list" 
+        || msg->request->action == "chat" 
+        || msg->request->action == "get_room_info" || msg->request->action == "move" || msg->request->action == "point_counting" || msg->request->action == "update_point_result" || msg->request->action == "gave_up")
     {
         std::string room_id = msg->request->data["room_id"].get<std::string>();
         std::shared_ptr<Room> room = g_rooms.get(room_id).value();

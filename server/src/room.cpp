@@ -214,7 +214,8 @@ void Room::pushOnline(std::string player_id) const {
 void Room::pushChatMessage(std::shared_ptr<ChatMessage> msg) const {
     nlohmann::json j = {
         {"room_id", getId()},
-        {"player_id", msg->uid},
+        {"uid", msg->uid},
+        {"name", msg->name},
         {"text", msg->text},
     };
     std::shared_ptr<PushMessage> pmsg = std::make_shared<PushMessage>("chat_message", j);
