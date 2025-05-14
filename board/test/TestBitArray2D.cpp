@@ -2,6 +2,7 @@
 
 #include "utils.h"
 #include "../include/Board.h"
+#include "Log.h"
 
 int main(int argc, char const *argv[])
 {
@@ -19,7 +20,7 @@ int main(int argc, char const *argv[])
     const BitArray2D board3 = board;
     print_board(board3);
 
-    std::cout << (board == board2) << std::endl;
-    std::cout << (board3 == board) << std::endl;
+    LOG_INFO(board == board2);
+    LOG_INFO(board3 == board);
     return 0;
 }

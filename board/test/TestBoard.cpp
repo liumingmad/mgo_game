@@ -2,6 +2,7 @@
 
 #include "../include/utils.h"
 #include "../include/Board.h"
+#include "Log.h"
 
 void testHasLiberty() {
     Board* board = new Board(5, 5);
@@ -21,9 +22,9 @@ void testHasLiberty() {
     std::vector<std::shared_ptr<Stone>> list;
     int has = board->hasLiberty(1, 1, 'W', tmp, list);
     print_board(tmp);
-    std::cout << "hasLiberty=" << has << std::endl;
+    LOG_INFO("hasLiberty={}", has);
     for (auto one : list) {
-        std::cout << one->x << "," << one->y << std::endl;
+        LOG_INFO("{},{}\n", one->x, one->y);
     }
 }
 
@@ -45,7 +46,7 @@ void testScanAndRemove() {
     std::vector<std::shared_ptr<Stone>> list;
     board->scanAndRemove('W', tmp, list);
     for (auto one : list) {
-        std::cout << one->x << "," << one->y << std::endl;
+        LOG_INFO("{},{}\n", one->x, one->y);
     }
     print_board(tmp);
 }
@@ -68,7 +69,7 @@ void testIsSuicide1() {
     std::vector<Stone> list;
     int suicide = board->isSuicide(2, 0, 'W', tmp);
     print_board(tmp);
-    std::cout << "suicide=" << suicide << std::endl;
+    LOG_INFO("suicide=", suicide);
 }
 
 void testIsSuicide2() {
@@ -86,7 +87,7 @@ void testIsSuicide2() {
     std::vector<Stone> list;
     int suicide = board->isSuicide(2, 0, 'W', tmp);
     print_board(tmp);
-    std::cout << "suicide=" << suicide << std::endl;
+    LOG_INFO("suicide=", suicide);
 }
 
 void testMove() {

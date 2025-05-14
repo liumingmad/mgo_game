@@ -176,7 +176,7 @@ void Server::handleListenfd(int fd) {
     socklen_t len = sizeof(clientaddr);
     int clientfd = Accept(fd, (struct sockaddr*)&clientaddr, &len);
     set_nonblocking(clientfd);
-    std::cout << "enter clientfd " << clientfd << std::endl; 
+    LOG_INFO("enter clientfd {}\n", clientfd);
 
     struct epoll_event ev;
     ev.events = EPOLLIN;
@@ -189,14 +189,14 @@ std::shared_ptr<Request> parseRequest(const std::string& jsonStr) {
     try {
         nlohmann::json j = nlohmann::json::parse(jsonStr);
         auto request = std::make_shared<Request>(j.get<Request>());
-        std::cout << "解析成功: " << j.dump(2) << std::endl;
+        LOG_INFO("解析成功: {}\n", j.dump(2));
         return request;
     }
     catch (const nlohmann::json::parse_error &e) {
-        std::cerr << "JSON 解析错误: " << e.what() << ", 字节 " << e.byte << std::endl;
+        LOG_ERROR("JSON 解析错误: {}, bytes {}", e.what(), e.byte);
     }
     catch (const std::exception &e) {
-        std::cerr << "其他错误: " << e.what() << std::endl;
+        LOG_ERROR("其他错误: {}\n", e.what());
     }
     return nullptr;
 }
@@ -216,7 +216,6 @@ int Server::handle_read(int fd) {
         Epoll_ctl(m_epfd, EPOLL_CTL_DEL, fd, nullptr);
         Close(fd);
         remove_client(fd);
-        std::cout << "client exit fd=" << fd << std::endl; 
     }
 
     // 读到任何东西，都认为客户端活着
@@ -347,7 +346,7 @@ void Server::schedule_write(int fd, const std::string &data)
 
 int Server::add_client(int fd, struct sockaddr_in addr) {
     std::shared_ptr<Client> client = std::make_shared<Client>();
-    std::cout << "add client id " << client->id << std::endl;
+    LOG_INFO("add client id {}\n", client->id);
     client->fd = fd;
     client->clientaddr = addr;
     client->activeTimestamp = get_now_milliseconds();
@@ -379,7 +378,7 @@ int Server::remove_client(int fd) {
     auto opt = g_clientMap.get(fd);
     assert(opt.has_value());
     std::shared_ptr<Client> client = opt.value();
-    std::cout << "remove client fd " << fd << ", id "<< client->id << std::endl;
+    LOG_INFO("remove client fd {}, id {}\n", fd, client->id);
     
     auto req = std::make_shared<Request>();
     req->action = "offline";
@@ -419,8 +418,8 @@ void Server::handleEventfd()
 
         case EVMESSAGE_TYPE_SERVER_PUSH: {
             auto data = std::any_cast<std::shared_ptr<std::string>>(msg->data);
-            std::cout << "EVMESSAGE_TYPE_SERVER_PUSH fd=" << fd << ", cid=" << client.value()->id << std::endl;
-            std::cout << (data->c_str()+HEADER_SIZE) << std::endl;
+            LOG_INFO("EVMESSAGE_TYPE_SERVER_PUSH fd={}, cid={}\n", fd, client.value()->id);
+            LOG_INFO(data->c_str()+HEADER_SIZE);
             schedule_write(fd, *data);
 
             LOG_INFO("\n\n-----------END-----------------");

@@ -12,7 +12,7 @@ int ServerPusher::server_push(std::string uid, std::shared_ptr<PushMessage> mess
 {
     auto opt = g_uidClientMap.get(uid);
     if (!opt.has_value()) {
-        std::cout << "server_push error: uid=" << uid << std::endl;
+        LOG_ERROR("server_push error: uid={}\n", uid);
         return -1;
     }
 
@@ -20,8 +20,6 @@ int ServerPusher::server_push(std::string uid, std::shared_ptr<PushMessage> mess
 
     nlohmann::json j = *message;
     std::string json = j.dump();
-
-    // std::cout << std::endl << json << std::endl;
 
     std::shared_ptr<std::string> data = std::make_shared<std::string>(HEADER_SIZE + json.length(), 0);
     ProtocolWriter pw;
@@ -37,8 +35,6 @@ int writeResponse(std::shared_ptr<Message> msg, const Response response)
     nlohmann::json j = response;
     std::string json = j.dump();
 
-    // std::cout << std::endl << json << std::endl;
-
     std::shared_ptr<std::string> data = std::make_shared<std::string>(HEADER_SIZE + json.length(), 0);
     ProtocolWriter pw;
     pw.wrap_response_header_buffer(data->data(), msg->header->serial_number, json);
@@ -51,8 +47,6 @@ int writeResponse(std::shared_ptr<Message> msg, const Response response)
 void response_heartbeat(int cid) 
 {
     std::string text = "pong";
-    // std::cout << std::endl << text << std::endl;
-
     std::shared_ptr<std::string> data = std::make_shared<std::string>(HEADER_SIZE + text.length(), 0);
     ProtocolWriter pw;
     pw.wrap_heartbeat_header_buffer(data->data(), text);

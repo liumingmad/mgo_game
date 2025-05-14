@@ -18,15 +18,15 @@ std::shared_ptr<Player> query_user(std::string id) {
         std::unique_ptr<sql::ResultSet> res(stmt->executeQuery(sql));
         while (res->next())
         {
-            std::cout << "ID: " << res->getInt("id") << ", Name: " << res->getString("username") << std::endl;
             player->id = std::to_string(res->getInt("id"));
             player->name = res->getString("username");
             player->level = res->getInt("level");
+            LOG_INFO("ID: {}, name:{}\n", player->id, player->name);
         }
     }
     catch (sql::SQLException &e)
     {
-        std::cerr << "Error: " << e.what() << std::endl;
+        LOG_ERROR("Error:{}\n", e.what());
         return nullptr;
     }
     return player;

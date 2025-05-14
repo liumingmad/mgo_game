@@ -4,17 +4,18 @@
 #include <iostream>
 #include "BitArray2D.h"
 #include <memory>
+#include "Log.h"
 void print_board(const BitArray2D& board)
 {
     int rows = board.getRows();
     int cols = board.getCols();
     for (int i = 0; i < rows; i++) {
         for (int j = 0; j < cols; j++) {
-            std::cout << board[i][j] << " ";
+            LOG_INFO(board[i][j] + " ");
         }
-        std::cout << std::endl;
+        LOG_INFO("\n");
     }
-    std::cout << "------------------------" << std::endl;
+    LOG_INFO("------------------------\n" );
 }
 
 void print_board_p(std::shared_ptr<BitArray2D> board) {
@@ -22,7 +23,7 @@ void print_board_p(std::shared_ptr<BitArray2D> board) {
 }
 
 void log(std::string msg) {
-    std::cout << msg << std::endl;
+    LOG_INFO(msg);
 }
 
 char get_opponent(char player) {

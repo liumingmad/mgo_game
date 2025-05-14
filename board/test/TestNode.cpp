@@ -2,14 +2,14 @@
 
 #include "utils.h"
 #include "../include/Node.h"
+#include <Log.h>
 
 void print_node(Node* node) {
-    std::cout << "-------------------------" << std::endl;
-    std::cout << "Node: " 
-        << node->getStone().getX() << ", " << node->getStone().getY() << ", " << node->getStone().getPlayer()
-        << std::endl;
+    LOG_INFO("-------------------------\n");
+    Stone s = node->getStone();
+    LOG_INFO("Node: {}, {}, {}", s.x, s.y, s.color);
     print_board(*(node->data));
-    std::cout << std::endl;
+    LOG_INFO("\n");
 }
 
 int main(int argc, char const *argv[])

@@ -212,7 +212,7 @@ bool Core::checkAuth(std::shared_ptr<Message> msg)
     auto opt = g_clientIdMap.get(msg->cid);
     if (!opt.has_value())
     {
-        std::cout << "Core::run() client not exist!" << std::endl;
+        LOG_INFO("Core::run() client not exist!\n");
         return false;
     }
 
@@ -293,7 +293,6 @@ void Core::findRoomListByPlayer(std::vector<std::shared_ptr<Room>>& list,
 
 void Core::do_offline(std::shared_ptr<Message> msg)
 {
-    std::cout << "do_offline()" << std::endl;
     try
     {
         auto opt = g_clientIdMap.get(msg->cid);

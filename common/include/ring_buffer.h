@@ -3,6 +3,7 @@
 
 #include <iostream>
 #include <cstring>
+#include "Log.h"
 
 class RingBuffer
 {
@@ -30,12 +31,12 @@ public:
     size_t push(char *data, int len)
     {
         if (isFull()) {
-            std::cout << "RingBuffer push is full" << std::endl;
+            LOG_ERROR("RingBuffer push is full\n");
             return 0;
         } 
 
         if (len > freespace()) {
-            std::cout << "RingBuffer push len>freespace" << std::endl;
+            LOG_ERROR("RingBuffer push len>freespace\n");
             return 0;
         } 
 
@@ -55,12 +56,10 @@ public:
     size_t pop(char *data, int len)
     {
         if (isEmpty()) {
-            // std::cout << "RingBuffer pop is empty" << std::endl;
             return 0;
         }
 
         if (len > size) {
-            // std::cout << "RingBuffer pop len > size" << std::endl;
             return 0;
         }
 
@@ -86,17 +85,14 @@ public:
 
     size_t peek(char* data, size_t len) {
         if (len <= 0) {
-            // std::cout << "RingBuffer peek len <= 0" << std::endl;
             return 0;
         }
 
         if (isEmpty()) {
-            // std::cout << "RingBuffer peek is empty" << std::endl;
             return 0;
         }
 
         if (len > size) {
-            // std::cout << "RingBuffer peek len > size" << std::endl;
             return 0;
         }
 
@@ -127,27 +123,27 @@ public:
         {
             if (i == this->head)
             {
-                std::cout << "H";
+                LOG_DEBUG("H");
             }
             if (i == this->tail)
             {
-                std::cout << "T";
+                LOG_DEBUG("T");
             }
             if (head > tail) {
                 if (i >= tail || i < head) {
-                    std::cout << this->buffer[i] << " ";
+                    LOG_DEBUG("{} ", buffer[i]);
                 } else {
-                    std::cout << "x" << " ";
+                    LOG_DEBUG("x ");
                 }
             } else {
                 if (i >= tail || i < head) {
-                    std::cout << this->buffer[i] << " ";
+                    LOG_DEBUG("{} ", buffer[i]);
                 } else {
-                    std::cout << "x" << " ";
+                    LOG_DEBUG("x ");
                 }
             }
         }
-        std::cout << std::endl;
+        LOG_DEBUG("\n");
     }
 
     void clear()

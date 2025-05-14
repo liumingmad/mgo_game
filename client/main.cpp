@@ -2,6 +2,7 @@
 #include "client.h"
 #include "protocol.h"
 #include <memory>
+#include <Log.h>
 
 
 int32_t bytesToInt(const uint8_t bytes[4]) {
@@ -53,7 +54,7 @@ int read_procotol(MgoClient client, std::shared_ptr<RingBuffer> rb) {
     char buf[4*1024] = { 0 };
     int n = client.socket_read(buf);
     if (n == 0) {
-        std::cout << "server close connect" << std::endl;
+        LOG_INFO("server close connect\n");
         return 0;
     }
 
@@ -71,7 +72,8 @@ int read_procotol(MgoClient client, std::shared_ptr<RingBuffer> rb) {
         char tmp[len];
         rb->peek(tmp, len);
         std::string str = std::string(tmp+HEADER_SIZE, header->data_length);
-        std::cout << str << std::endl;
+        LOG_DEBUG(str);
+        LOG_DEBUG("\n");
 
         // 4. 删除处理过的数据
         rb->pop(nullptr, len);
@@ -110,11 +112,11 @@ int test_intToBytes() {
     int32_t number = 123456789;
     uint8_t bytes[4];
     intToBytes(number, bytes);
-    std::cout << "Byte array: ";
+    LOG_INFO("Byte array: ");
     for (int i = 0; i < 4; ++i) {
-        std::cout << static_cast<int>(bytes[i]) << " ";
+        LOG_INFO("{} ", static_cast<int>(bytes[i]));
     }
-    std::cout << std::endl;
+    LOG_INFO("\n");
     return 0;
 }
 
@@ -122,7 +124,7 @@ int test_intToBytes() {
 int test_bytesToInt() {
     uint8_t bytes[4] = {7, 91, 205, 21}; // 对应于 123456789
     int32_t number = bytesToInt(bytes);
-    std::cout << "Converted number: " << number << std::endl;
+    LOG_INFO("Converted number: {}", number);
     return 0;
 }
 
