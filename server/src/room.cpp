@@ -6,6 +6,8 @@
 #include "start_game_body.h"
 #include "common_utils.h"
 #include <global.h>
+#include <Sgf.h>
+#include "db_utils.h"
 
 void to_json(nlohmann::json &j, const Room &r)
 {
@@ -244,15 +246,25 @@ void Room::switchPointCountingState(u_int8_t new_state)
 void Room::markBlackWins() {
     getGoClock()->stop();
     switchRoomState(Room::ROOM_STATE_GAME_OVER);
+    saveGameResult();
 }
 
 void Room::markWhiteWins() {
     getGoClock()->stop();
     switchRoomState(Room::ROOM_STATE_GAME_OVER);
+    saveGameResult();
 }
 
 void Room::saveGameResult() {
     // 保存棋谱
+    std::shared_ptr<Sgf> sgf = std::make_shared<Sgf>();
+    sgf->bLevel = getBlackPlayer()->level; 
+    sgf->bName = getBlackPlayer()->name; 
+    sgf->wLevel = getWhitePlayer()->level; 
+    sgf->wName = getWhitePlayer()->name; 
+    sgf->sgf = "ming sgf";
+    sgf->timeMs = get_now_milliseconds();
+    bool success = saveSgf(sgf);
     // 更新战绩
     // 更新段位
 }

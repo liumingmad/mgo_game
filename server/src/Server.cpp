@@ -171,6 +171,10 @@ std::string genTimerId(int fd) {
     return TIME_TASK_ID_HEARTBEAT + to_string(fd);
 }
 
+bool isHeartBeat(std::shared_ptr<ProtocolHeader> h) {
+    return h->command == ProtocolHeader::HEADER_COMMAND_HEART;
+}
+
 void Server::handleListenfd(int fd) {
     struct sockaddr_in clientaddr;
     socklen_t len = sizeof(clientaddr);
@@ -193,7 +197,7 @@ std::shared_ptr<Request> parseRequest(const std::string& jsonStr) {
         return request;
     }
     catch (const nlohmann::json::parse_error &e) {
-        LOG_ERROR("JSON 解析错误: {}, bytes {}", e.what(), e.byte);
+        LOG_ERROR("JSON 解析错误: {}, bytes {}, json={}", e.what(), e.byte, jsonStr);
     }
     catch (const std::exception &e) {
         LOG_ERROR("其他错误: {}\n", e.what());
@@ -278,7 +282,7 @@ void Server::handle_message(std::shared_ptr<Client> client) {
     while (!queue.empty()) {
         std::shared_ptr<Message> msg;
         if (queue.dequeue(msg)) {
-            if (msg->header && msg->header->command == ProtocolHeader::HEADER_COMMAND_HEART) {
+            if (msg->header && isHeartBeat(msg->header)) {
                 response_heartbeat(msg->cid);
                 continue;
             }

@@ -260,7 +260,7 @@ void RoomCore::do_point_counting_result(std::shared_ptr<RoomMessage> roommsg)
         // 如果两个人都accept，则标记room状态, 推送game over到客户端
         if (room->is_both_accept())
         {
-            room->switchRoomState(Room::ROOM_STATE_GAME_OVER);
+            room->markBlackWins();
 
             // 对于黑方和白方，则提示确认目数
             // 推送到room内所有人
@@ -423,7 +423,7 @@ void RoomCore::do_gave_up(std::shared_ptr<RoomMessage> roommsg)
     }
     catch (const std::exception &e)
     {
-        std::cerr << "其他错误: " << e.what() << std::endl;
+        LOG_ERROR("其他错误: {}\n", e.what());
     }
 }
 
