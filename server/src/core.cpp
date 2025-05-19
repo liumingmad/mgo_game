@@ -17,6 +17,24 @@
 #include "player.h"
 #include "common_utils.h"
 
+
+void Core::do_refresh_token(std::shared_ptr<Message> msg)
+{
+    try
+    {
+        auto client = g_clientIdMap.get(msg->cid).value();
+        // 创建token
+        SignInResponse resp;
+        resp.token = generate_jwt(client->user_id);
+        writeResponse(msg, Response{200, "refresh_token success", resp});
+    }
+    catch (const std::exception &e)
+    {
+        std::cerr << "其他错误: " << e.what() << std::endl;
+    }
+}
+
+
 void Core::do_sign_in(std::shared_ptr<Message> msg)
 {
     try
@@ -223,27 +241,20 @@ bool Core::checkAuth(std::shared_ptr<Message> msg)
     }
 
     std::string token = msg->request->data["tcpToken"];
-
-    if (!token.empty())
-    {
-        if (!validate_jwt(token))
-        {
-            LOG_ERROR("Core::run() token is invalid");
-            writeResponse(msg, Response{401, "token is invalid", {}});
-            return 0;
-        }
-        on_auth_success(msg->cid, token);
-        return true;
-    }
-
-    if (msg->request->action == "sign_in")
-    {
-        do_sign_in(msg);
+    if (token.empty()) {
+        writeResponse(msg, Response{401, "Insufficient authentication", {}});
         return false;
     }
 
-    writeResponse(msg, Response{401, "Insufficient authentication", {}});
-    return false;
+    if (!validate_jwt(token))
+    {
+        LOG_ERROR("Core::run() token is invalid");
+        writeResponse(msg, Response{401, "token is invalid", {}});
+        return 0;
+    }
+    writeResponse(msg, Response{200, "handshake success", {}});
+    on_auth_success(msg->cid, token);
+    return true;
 }
 
 std::shared_ptr<Room> Core::getNeedBackRoom(std::shared_ptr<Player> p)
@@ -350,12 +361,21 @@ int Core::run(std::shared_ptr<Message> msg)
         return 0;
     }
 
+    if (msg->request->action == "sign_in")
+    {
+        do_sign_in(msg);
+        return false;
+    }
+
     if (!checkAuth(msg))
     {
         return 0;
     }
 
-    if (msg->request->action == "get_room_list")
+    if (msg->request->action == "refresh_token") {
+        do_refresh_token(msg);
+    }
+    else if (msg->request->action == "get_room_list")
     {
         do_get_room_list(msg);
     }

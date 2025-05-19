@@ -26,6 +26,7 @@ public:
 
     bool checkAuth(std::shared_ptr<Message> msg);
     void on_auth_success(const int fd, const std::string token);
+    void do_refresh_token(std::shared_ptr<Message> msg);
     void do_sign_in(std::shared_ptr<Message> msg);
     void do_get_room_list(std::shared_ptr<Message> msg);
     void do_create_room(std::shared_ptr<Message> msg);

@@ -50,7 +50,6 @@ bool saveSgf(std::shared_ptr<Sgf> sgf) {
         pstmt->setInt64(6, sgf->timeMs);
 
         pstmt->executeUpdate();
-        std::cout << "插入成功！" << std::endl;
     }
     catch (sql::SQLException &e)
     {
