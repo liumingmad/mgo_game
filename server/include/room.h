@@ -127,9 +127,7 @@ public:
 
     void countdown()
     {
-        // std::shared_ptr<GoClock> goClock = std::make_shared<GoClock>(mBClock, mWClock);
-        TimerManager::instance().addTask(mRoomId, 3000, [&]()
-                                         {
+        TimerManager::instance().addTask(mRoomId, 30000, [&]() {
             if (!mRunning.load(std::memory_order_acquire)) return;
 
             if (mBClockWorking.load(std::memory_order_acquire)) {
