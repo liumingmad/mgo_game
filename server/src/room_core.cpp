@@ -501,15 +501,15 @@ void RoomCore::do_offline(std::shared_ptr<RoomMessage> roommsg)
             room->getGoClock()->stop();
 
             // 开启定时器，如果180s，没回来，则判负
-            // std::string taskId = getOfflineTaskId(room->getId());
-            // TimerManager::instance().addTask(taskId, 180 * 1000, [room, user_id]() {
+            std::string taskId = getOfflineTaskId(room->getId());
+            TimerManager::instance().addTask(taskId, 180 * 1000, [room, user_id]() {
                 // 得用发消息的方式，否则又并发了
-                // std::shared_ptr<RoomMessage> rmsg = std::make_shared<RoomMessage>();
-                // rmsg->room = room;
-                // rmsg->action = "offline_timeout";
-                // rmsg->data = user_id;
-                // room->postRoomMessage(rmsg); 
-            // });
+                std::shared_ptr<RoomMessage> rmsg = std::make_shared<RoomMessage>();
+                rmsg->room = room;
+                rmsg->action = "offline_timeout";
+                rmsg->data = user_id;
+                room->postRoomMessage(rmsg); 
+            });
         }
         else
         {
