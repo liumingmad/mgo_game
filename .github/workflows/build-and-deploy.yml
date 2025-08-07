@@ -8,7 +8,10 @@ on:
     branches: [ main ]
 
 env:
-  REGISTRY: registry.cn-hangzhou.aliyuncs.com
+  # 阿里云容器镜像服务配置
+  # REGISTRY: registry.cn-hangzhou.aliyuncs.com
+  REGISTRY: crpi-rnj5shn1s8desszs.cn-heyuan.personal.cr.aliyuncs.com
+  NAMESPACE: mingmad  # 请替换为你的命名空间
   IMAGE_NAME: mgo-game-server
 
 jobs:
@@ -34,7 +37,7 @@ jobs:
       id: meta
       uses: docker/metadata-action@v5
       with:
-        images: ${{ env.REGISTRY }}/${{ secrets.ALIYUN_NAMESPACE }}/${{ env.IMAGE_NAME }}
+        images: ${{ env.REGISTRY }}/${{ env.NAMESPACE }}/${{ env.IMAGE_NAME }}
         tags: |
           type=ref,event=branch
           type=ref,event=pr
@@ -67,7 +70,7 @@ jobs:
       if: github.event_name != 'pull_request'
       uses: aquasecurity/trivy-action@master
       with:
-        image-ref: ${{ env.REGISTRY }}/${{ secrets.ALIYUN_NAMESPACE }}/${{ env.IMAGE_NAME }}:${{ github.sha }}
+        image-ref: ${{ env.REGISTRY }}/${{ env.NAMESPACE }}/${{ env.IMAGE_NAME }}:${{ github.sha }}
         format: 'sarif'
         output: 'trivy-results.sarif'
     
@@ -86,7 +89,7 @@ jobs:
     - name: Deploy to production
       run: |
         echo "部署到生产环境的逻辑"
-        echo "镜像地址: ${{ env.REGISTRY }}/${{ secrets.ALIYUN_NAMESPACE }}/${{ env.IMAGE_NAME }}:latest"
+        echo "镜像地址: ${{ env.REGISTRY }}/${{ env.NAMESPACE }}/${{ env.IMAGE_NAME }}:latest"
         # 这里可以添加实际的部署逻辑，比如:
         # - SSH到服务器并拉取新镜像
         # - 使用Kubernetes部署
