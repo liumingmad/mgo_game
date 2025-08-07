@@ -41,10 +41,9 @@ README.md
 *.md
 docs/
 
-# 配置文件 (可能包含敏感信息)
+# 配置文件 (排除可能包含敏感信息的文件，但保留config目录)
 *.conf
 *.cfg
-config/
 configs/
 
 # 测试文件
