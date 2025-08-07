@@ -64,21 +64,6 @@ jobs:
     - name: Output image digest
       if: github.event_name != 'pull_request'
       run: echo ${{ steps.build.outputs.digest }}
-    
-    # 可选: 运行安全扫描
-    - name: Run Trivy vulnerability scanner
-      if: github.event_name != 'pull_request'
-      uses: aquasecurity/trivy-action@master
-      with:
-        image-ref: ${{ env.REGISTRY }}/${{ env.NAMESPACE }}/${{ env.IMAGE_NAME }}:${{ github.sha }}
-        format: 'sarif'
-        output: 'trivy-results.sarif'
-    
-    - name: Upload Trivy scan results to GitHub Security tab
-      if: github.event_name != 'pull_request'
-      uses: github/codeql-action/upload-sarif@v3
-      with:
-        sarif_file: 'trivy-results.sarif'
 
   deploy:
     needs: build
