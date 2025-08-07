@@ -95,7 +95,7 @@ RUN groupadd -r appuser && useradd -r -g appuser appuser && \
 USER appuser
 
 # 暴露端口 (根据你的服务器配置调整)
-EXPOSE 8080
+EXPOSE 8003
 
 # 启动应用
 CMD ["./Mgo"]

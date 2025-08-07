@@ -102,7 +102,7 @@ jobs:
           docker run -d \
             --name $CONTAINER_NAME \
             --restart unless-stopped \
-            -p 8080:8080 \
+            -p 8003:8003 \
             -e MYSQL_HOST="${{ secrets.MYSQL_HOST || 'localhost' }}" \
             -e MYSQL_PORT="${{ secrets.MYSQL_PORT || '3306' }}" \
             -e MYSQL_USERNAME="${{ secrets.MYSQL_USERNAME || 'root' }}" \
