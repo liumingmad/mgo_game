@@ -50,7 +50,7 @@ RUN apt-get update && apt-get install -y \
     libssl3 \
     libcurl4 \
     libcrypto++8 \
-    libmysqlcppconn8 \
+    libmysqlcppconn-dev \
     libhiredis0.14 \
     libspdlog1 \
     libfmt8 \
