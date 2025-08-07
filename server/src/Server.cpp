@@ -304,7 +304,7 @@ void Server::handle_write(int fd)
     std::shared_ptr<Client> client = opt.value(); 
 
     auto &buf = client->pendingWriteBuffer;
-    ssize_t n = write(fd, buf.data(), buf.size());
+    ssize_t n = Write(fd, buf.data(), buf.size());
     if (n > 0)
     {
         buf.erase(0, n); // 移除已发送部分
