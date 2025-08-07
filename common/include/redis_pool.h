@@ -2,6 +2,7 @@
 #define REDIS_CONF_H
 
 #include <sw/redis++/redis++.h>
+#include "ConfigManager.h"
 
 using namespace sw::redis;
 
@@ -22,15 +23,19 @@ public:
     }
     
     bool init() {
+        auto config = ConfigManager::getInstance()->getRedisConfig();
+        
         ConnectionOptions opts;
-        opts.host = "172.17.0.1";
-        opts.port = 6379;
-        opts.password = "123456";
+        opts.host = config.host;
+        opts.port = config.port;
+        if (!config.password.empty()) {
+            opts.password = config.password;
+        }
 
         ConnectionPoolOptions pool_opts;
-        pool_opts.size = 3;  // 设置连接池大小
-        pool_opts.wait_timeout = std::chrono::milliseconds(200);  // 可选，设置等待超时时间
-        pool_opts.connection_lifetime = std::chrono::minutes(10);  // 可选，设置连接生命周期
+        pool_opts.size = config.pool_size;
+        pool_opts.wait_timeout = std::chrono::milliseconds(config.wait_timeout_ms);
+        pool_opts.connection_lifetime = std::chrono::minutes(config.connection_lifetime_minutes);
 
         redis = new Redis(opts, pool_opts);
         return true;

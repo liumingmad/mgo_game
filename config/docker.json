@@ -1,0 +1,31 @@
+{
+  "server": {
+    "port": 8080,
+    "host": "0.0.0.0"
+  },
+  "database": {
+    "mysql": {
+      "host": "mysql-server",
+      "port": 3306,
+      "username": "mgo_user",
+      "password": "mgo_password",
+      "database": "mgo_game",
+      "pool_size": 15,
+      "connection_timeout": 10
+    }
+  },
+  "cache": {
+    "redis": {
+      "host": "redis-server",
+      "port": 6379,
+      "password": "",
+      "pool_size": 5,
+      "wait_timeout_ms": 500,
+      "connection_lifetime_minutes": 30
+    }
+  },
+  "logging": {
+    "level": "info",
+    "file": "/app/logs/mgo-server.log"
+  }
+}

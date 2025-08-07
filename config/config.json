@@ -1,0 +1,31 @@
+{
+  "server": {
+    "port": 8080,
+    "host": "0.0.0.0"
+  },
+  "database": {
+    "mysql": {
+      "host": "127.0.0.1",
+      "port": 3306,
+      "username": "root",
+      "password": "123456",
+      "database": "mgo",
+      "pool_size": 10,
+      "connection_timeout": 5
+    }
+  },
+  "cache": {
+    "redis": {
+      "host": "127.0.0.1",
+      "port": 6379,
+      "password": "",
+      "pool_size": 3,
+      "wait_timeout_ms": 200,
+      "connection_lifetime_minutes": 10
+    }
+  },
+  "logging": {
+    "level": "info",
+    "file": "logs/mgo-server.log"
+  }
+}

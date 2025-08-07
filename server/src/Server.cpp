@@ -15,6 +15,7 @@
 #include "core.h"
 #include "db_connection_pool.h"
 #include "redis_pool.h"
+#include "ConfigManager.h"
 #include "timer.h"
 #include "global.h"
 #include <TimerManager.h>
@@ -66,13 +67,21 @@ int Server::init() {
     // 在service guard中处理
     // signal(SIGPIPE, SIG_IGN);
 
+    // 初始化配置管理器
+    ConfigManager* config = ConfigManager::getInstance();
+    if (!config->loadConfig("config/config.json")) {
+        LOG_ERROR("Failed to load configuration file");
+        return -1;
+    }
+
     // 初始化数据库连接池
+    auto mysql_config = config->getMySQLConfig();
     DBConnectionPool::getInstance()->initPool(
-        "tcp://172.17.0.1:3306",
-        "root",
-        "123456",
-        "mgo",
-        5); // 初始连接数设为15
+        mysql_config.getConnectionUrl(),
+        mysql_config.username,
+        mysql_config.password,
+        mysql_config.database,
+        mysql_config.pool_size);
     
     RedisPool& redisPool = RedisPool::getInstance();
     redisPool.init();
