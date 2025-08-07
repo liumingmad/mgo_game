@@ -82,8 +82,8 @@ WORKDIR /app
 # 复制编译好的可执行文件
 COPY --from=builder /app/build/main/Mgo /app/
 
-# 复制配置文件
-COPY --from=builder /app/config/ /app/config/
+# 复制配置文件 (直接从构建上下文复制，不从builder阶段)
+COPY config/ /app/config/
 
 # 创建日志目录
 RUN mkdir -p /app/logs
