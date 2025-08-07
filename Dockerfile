@@ -38,6 +38,13 @@ RUN git clone https://github.com/Thalhammer/jwt-cpp.git /tmp/jwt-cpp && \
     make install && \
     rm -rf /tmp/jwt-cpp
 
+# 安装moodycamel concurrentqueue库 (header-only库)
+RUN git clone https://github.com/cameron314/concurrentqueue.git /tmp/concurrentqueue && \
+    cd /tmp/concurrentqueue && \
+    mkdir -p /usr/local/include/moodycamel && \
+    cp *.h /usr/local/include/moodycamel/ && \
+    rm -rf /tmp/concurrentqueue
+
 # 创建工作目录
 WORKDIR /app
 
