@@ -17,14 +17,13 @@ RUN apt-get update && apt-get install -y \
     libhiredis-dev \
     libspdlog-dev \
     libfmt-dev \
-    libjwt-dev \
     && rm -rf /var/lib/apt/lists/*
 
-# 安装redis++库 (需要从源码编译)
+# 安装redis++库 (从源码编译，因为Ubuntu 22.04没有预编译包)
 RUN git clone https://github.com/sewenew/redis-plus-plus.git /tmp/redis-plus-plus && \
     cd /tmp/redis-plus-plus && \
     mkdir build && cd build && \
-    cmake -DREDIS_PLUS_PLUS_CXX_STANDARD=17 .. && \
+    cmake -DREDIS_PLUS_PLUS_CXX_STANDARD=20 .. && \
     make -j$(nproc) && \
     make install && \
     ldconfig && \
@@ -51,11 +50,10 @@ RUN apt-get update && apt-get install -y \
     libssl3 \
     libcurl4 \
     libcrypto++8 \
-    libmysqlcppconn9 \
+    libmysqlcppconn8 \
     libhiredis0.14 \
     libspdlog1 \
     libfmt8 \
-    libjwt0 \
     && rm -rf /var/lib/apt/lists/*
 
 # 复制redis++运行时库
