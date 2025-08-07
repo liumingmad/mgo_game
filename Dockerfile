@@ -35,9 +35,9 @@ WORKDIR /app
 # 复制源代码
 COPY . .
 
-# 创建构建目录并编译
+# 创建构建目录并编译 (禁用测试以避免依赖测试文件)
 RUN mkdir -p build && cd build && \
-    cmake -DCMAKE_BUILD_TYPE=Release .. && \
+    cmake -DCMAKE_BUILD_TYPE=Release -DENABLE_BOARD_TESTS=OFF .. && \
     make -j$(nproc)
 
 # 运行时镜像
