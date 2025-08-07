@@ -29,6 +29,15 @@ RUN git clone https://github.com/sewenew/redis-plus-plus.git /tmp/redis-plus-plu
     ldconfig && \
     rm -rf /tmp/redis-plus-plus
 
+# 安装jwt-cpp库 (header-only库)
+RUN git clone https://github.com/Thalhammer/jwt-cpp.git /tmp/jwt-cpp && \
+    cd /tmp/jwt-cpp && \
+    mkdir build && cd build && \
+    cmake -DJWT_BUILD_EXAMPLES=OFF .. && \
+    make -j$(nproc) && \
+    make install && \
+    rm -rf /tmp/jwt-cpp
+
 # 创建工作目录
 WORKDIR /app
 
