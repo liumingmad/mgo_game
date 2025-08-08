@@ -40,9 +40,9 @@ void init_async_logger(bool to_console) {
     // 创建 sink 列表
     std::vector<spdlog::sink_ptr> sinks;
 
-    // 文件 sink（注意不能用 ~，需要使用绝对路径）
+    // 文件 sink（使用容器内的日志目录）
     auto file_sink = std::make_shared<spdlog::sinks::basic_file_sink_mt>(
-        "/home/ming/mgo/logs/async.log", true);
+        "/app/logs/async.log", true);
     sinks.push_back(file_sink);
 
     if (to_console) {
